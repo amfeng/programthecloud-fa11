@@ -61,6 +61,7 @@ class SubFIFO
   end
 end
 
+=begin
 fifo = SubFIFO.new
 fifo.tick
 fifo.pipe_in <+ [ ["localhost:00003", "localhost:54321", 3, "qux"] ]
@@ -79,3 +80,4 @@ puts fifo.intermediate.map {|t| "got #{t.ident}"}
 puts "==Timestamped=="
 puts fifo.timestamped.length
 puts fifo.timestamped.map {|t| "sent #{t.ident} at #{t.time}"}
+=end
