@@ -13,7 +13,6 @@ class FC
 
   bloom do
     timestamped <= pipe_chan {|c| [budtime, c.ident, c.payload]}
-    #stdio <~ [[timestamped.length]]
   end
 
 end
@@ -34,13 +33,15 @@ class TestFIFO < Test::Unit::TestCase
     receiver_instance.run_bg
     workload(sender_instance)
     4.times {receiver_instance.sync_do}
-    receiver_instance.timestamped.each do |t|
-      receiver_instance.timestamped.each do |t2|
-        if t.ident < t2.ident
-          assert(t.time < t2.time)
+    receiver_instance.sync_do do
+      receiver_instance.timestamped.each do |t|
+        receiver_instance.timestamped.each do |t2|
+          if t.ident < t2.ident
+            assert(t.time < t2.time)
+          end
         end
       end
+      assert_equal(4, receiver_instance.timestamped.length)
     end
-    assert_equal(4, receiver_instance.timestamped.length)
   end
 end
