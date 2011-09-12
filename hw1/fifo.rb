@@ -12,11 +12,11 @@ module FIFODelivery
   include DeliveryProtocol
 
   state do
-    channel :pipe_chan, [:@dst, :src, :ident] => [:payload]
+    channel :pipe_channel, [:@dst, :src, :ident] => [:payload]
+    scratch :pipe_chan, [:dst, :src, :ident] => [:payload]
     table :intermediate, [:dst, :src, :ident] => [:payload]
     table :current_ident, [] => [:ident]
     scratch :current, [] => [:dst, :src, :ident, :payload]
-    periodic :clock, 1
   end
 
   bootstrap do
@@ -24,16 +24,23 @@ module FIFODelivery
   end
 
   bloom :snd do
-    intermediate <= pipe_in
+    # On the sender, immediately send packets in pipe_in to the receiver
+    pipe_channel <~ pipe_in
+  end
+
+  bloom :save do
+    # On the receiver, add anything that came from the sender to an 
+    # intermediate table for further processing
+    intermediate <= pipe_channel
   end
 
   bloom :process do
-    stdio <~ [["tick #{current_ident {|i| i.ident}} at #{budtime}"]]
+    # On the receiver, add the packets in order to pipe_chan 
+    #stdio <~ [["tick #{current_ident {|i| i.ident}} at #{budtime}"]]
 
-    # Find the next request to send to pipe_chan (according to the counter)
+    # Find the next packet to add to pipe_chan (according to the counter)
     current <= (intermediate * current_ident).pairs { |p, i| p if p.ident == i.ident} 
-    stdio <~ current
-    pipe_chan <~ current
+    pipe_chan <+ current
     
     # Remove from intermediate
     intermediate <- current
