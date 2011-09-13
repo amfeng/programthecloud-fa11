@@ -20,10 +20,6 @@ module FIFODelivery
     scratch :current, [] => [:dst, :src, :ident, :payload]
   end
 
-  bootstrap do 
-    current_idents <= [["localhost:54321", 0]]
-  end
-
   bloom :snd do
     # On the sender, immediately send packets in pipe_in to the receiver
     pipe_channel <~ pipe_in
