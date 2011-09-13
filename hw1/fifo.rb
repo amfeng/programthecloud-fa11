@@ -22,8 +22,7 @@ module FIFODelivery
     # Temporary "variable" for the current request chosen in order
     scratch :current, [] => [:dst, :src, :ident, :payload]
 
-    # Tables to keep track of the counters for each src
-    scratch :current_ident, [] => [:src, :ident]
+    # Keep track of the counters for each src
     table :current_idents, [:src] => [:ident]
   end
 
@@ -43,11 +42,12 @@ module FIFODelivery
     # create it
     #stdio <~ [current_idents {|c| ["#{c.src}, #{c.ident}"]}, ["---"]]
 
-    # Check if the row exists
-    temp :check_exists <= (pipe_channel * current_idents).pairs(:src => :src) { |u, c| [c.src, c.ident] }
+    # Find which src's are missing 
+    temp :missing <= pipe_channel.notin(current_idents, :src => :src) 
 
-    # If not, append a new row for the src
-    current_idents <+ pipe_channel {|x| [x.src, 0] unless check_exists.length > 0 } 
+    # If it doesn't exist, append a new row for the src
+    # m[1] = src
+    current_idents <+ missing {|m| [m[1], 0] } 
   end
 
   bloom :process do
@@ -63,9 +63,10 @@ module FIFODelivery
     intermediate <- current
 
     # Increment counter for this specific sender
-    current_ident <= (current * current_idents).pairs(:src => :src) { |u, c| [c.src, c.ident] }
+    temp :current_ident <= (current * current_idents).pairs(:src => :src) { |u, c| [c.src, c.ident] }
 
-    current_idents <+- current_ident {|c| [c.src, c.ident + 1] }
+    # c[0] = src, c[1] = ident
+    current_idents <+- current_ident {|c| [c[0], c[1] + 1] }
   end
 
   bloom :done do
