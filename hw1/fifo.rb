@@ -19,6 +19,9 @@ module FIFODelivery
     # them in order
     table :intermediate, [:dst, :src, :ident] => [:payload]
 
+    # Temporary "variable" for the current request chosen in order
+    scratch :current, [] => [:dst, :src, :ident, :payload]
+
     # Tables to keep track of the counters for each src
     scratch :current_ident, [] => [:src, :ident]
     table :current_idents, [:src] => [:ident]
@@ -36,11 +39,12 @@ module FIFODelivery
   end
 
   bloom :counter_init do
-    # If the counter for something that just came in does not exist yet, create it
+    # If the counter for something that just came in does not exist yet, 
+    # create it
     #stdio <~ [current_idents {|c| ["#{c.src}, #{c.ident}"]}, ["---"]]
 
     # Check if the row exists
-    temp :check_exists <= (pipe_channel * current_idents).pairs {|u, c| [c.src, c.ident] if u.src == c.src}
+    temp :check_exists <= (pipe_channel * current_idents).pairs(:src => :src) { |u, c| [c.src, c.ident] }
 
     # If not, append a new row for the src
     current_idents <+ pipe_channel {|x| [x.src, 0] unless check_exists.length > 0 } 
@@ -50,15 +54,16 @@ module FIFODelivery
     # On the receiver, add the packets in order to pipe_chan 
     #stdio <~ [["tick #{current_ident {|i| i.ident}} at #{budtime}"]]
 
-    # Find the next packet to add to pipe_chan (according to the counter for this specific sender)
-    temp :current <= (intermediate * current_idents).pairs { |p, i| p if p.ident == i.ident and p.src == i.src} 
+    # Find the next packet to add to pipe_chan (according to the counter 
+    # for this specific sender)
+    current <= (intermediate * current_idents).lefts(:ident => :ident, :src => :src) 
     pipe_chan <+ current
     
     # Remove from intermediate
     intermediate <- current
 
     # Increment counter for this specific sender
-    current_ident <= (current * current_idents).pairs {|u, c| [c.src, c.ident] if u.src == c.src }
+    current_ident <= (current * current_idents).pairs(:src => :src) { |u, c| [c.src, c.ident] }
 
     current_idents <+- current_ident {|c| [c.src, c.ident + 1] }
   end
