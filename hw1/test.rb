@@ -47,20 +47,28 @@ class TestFIFO < Test::Unit::TestCase
 
     sender_instance.run_bg
     sender_instance_2.run_bg
+    sender_instance_3.run_bg
     receiver_instance.run_bg
     workload(sender_instance)
     workload2(sender_instance_2)
     workload3(sender_instance_2)
     4.times {receiver_instance.sync_do}
-    receiver_instance.sync_do do
-      receiver_instance.timestamped.each do |t|
-        receiver_instance.timestamped.each do |t2|
-          if t.ident < t2.ident and t.src == t2.src
-            assert(t.time < t2.time)
-          end
+
+    receiver_instance.timestamped.each do |t|
+      receiver_instance.timestamped.each do |t2|
+        # Check ordering is correct
+        if t.ident < t2.ident and t.src == t2.src
+          assert(t.time < t2.time)
+        end
+
+        # Check only one packet per sender at a time
+        if t != t2 and t.time == t2.time 
+          assert(t.src != t2.src)
         end
       end
-      assert_equal(12, receiver_instance.timestamped.length)
     end
+    
+    # Check number of packets received is correct
+    assert_equal(12, receiver_instance.timestamped.length)
   end
 end

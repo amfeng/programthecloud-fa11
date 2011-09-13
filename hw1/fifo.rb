@@ -20,7 +20,7 @@ module FIFODelivery
     table :intermediate, [:dst, :src, :ident] => [:payload]
 
     # Temporary "variable" for the current request chosen in order
-    scratch :current, [] => [:dst, :src, :ident, :payload]
+    scratch :current, [:dst, :src] => [:ident, :payload]
 
     # Keep track of the counters for each src
     table :current_idents, [:src] => [:ident]
