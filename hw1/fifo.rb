@@ -37,20 +37,14 @@ module FIFODelivery
 
   bloom :counter_init do
     # If the counter for something that just came in does not exist yet, create it
+    #stdio <~ [current_idents {|c| ["#{c.src}, #{c.ident}"]}, ["---"]]
 
-    #current_idents <+ pipe_channel {|x| [x.src, 0] unless (((current_idents * pipe_channel).pairs (:src => :src)).exists?) }
+    # Check if the row exists
     temp :check_exists <= (pipe_channel * current_idents).pairs {|u, c| [c.src, c.ident] if u.src == c.src}
-    #stdio <~ check_exists
+
+    # If not, append a new row for the src
     current_idents <+ pipe_channel {|x| [x.src, 0] unless check_exists.length > 0 } 
-    #stdio <~ current_ident
 
-    #current_idents <= (current { |x| [x.src, 0] } if (((current * current_idents).pairs {|u, c| [] if u.src == c.src }).length == 0))
-
-    #current_ident <= (((current * current_idents).pairs {|u, c| [c.src, c.ident] if u.src == c.src }) or ([ current { |x| [x.src, 0] } ])) 
-    current_idents <+- current_ident {|c| [c.src, c.ident + 1] }
-
-    stdio <~ [current_idents {|c| ["#{c.src}, #{c.ident}"]}, ["---"]]
-    #stdio <~ current_ident {|c| ["#{c.src}, #{c.ident}"]}
   end
 
   bloom :process do
@@ -68,44 +62,9 @@ module FIFODelivery
     current_ident <= (current * current_idents).pairs {|u, c| [c.src, c.ident] if u.src == c.src }
 
     current_idents <+- current_ident {|c| [c.src, c.ident + 1] }
-
   end
 
   bloom :done do
     pipe_sent <= pipe_chan 
   end
 end
-
-class SubFIFO
-  include Bud
-  include FIFODelivery
-
-  state do
-    table :timestamped, [:time, :ident, :payload]
-  end
-
-  bloom do
-    timestamped <= pipe_chan {|c| [budtime, c.ident, c.payload]}
-  end
-end
-
-=begin
-fifo = SubFIFO.new
-fifo.tick
-fifo.pipe_in <+ [ ["localhost:00003", "localhost:54321", 3, "qux"] ]
-fifo.tick
-fifo.pipe_in <+ [ ["localhost:00001", "localhost:54321", 1, "bar"] ]
-fifo.tick
-fifo.pipe_in <+ [ ["localhost:00000", "localhost:54321", 0, "foo"] ]
-fifo.tick
-fifo.pipe_in <+ [ ["localhost:00002", "localhost:54321", 2, "baz"] ]
-5.times {fifo.tick}
-
-
-puts "==Intermediate=="
-puts fifo.intermediate.length
-puts fifo.intermediate.map {|t| "got #{t.ident}"}
-puts "==Timestamped=="
-puts fifo.timestamped.length
-puts fifo.timestamped.map {|t| "sent #{t.ident} at #{t.time}"}
-=end
