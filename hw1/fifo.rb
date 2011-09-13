@@ -14,10 +14,14 @@ module FIFODelivery
   state do
     channel :pipe_channel, [:@dst, :src, :ident] => [:payload]
     scratch :pipe_chan, [:dst, :src, :ident] => [:payload]
+
+    # Buffer to keep requests received over pipe_chan until we can process
+    # them in order
     table :intermediate, [:dst, :src, :ident] => [:payload]
-    table :current_idents, [:src] => [:ident]
+
+    # Tables to keep track of the counters for each src
     scratch :current_ident, [] => [:src, :ident]
-    scratch :current, [] => [:dst, :src, :ident, :payload]
+    table :current_idents, [:src] => [:ident]
   end
 
   bloom :snd do
@@ -40,7 +44,6 @@ module FIFODelivery
 
     # If not, append a new row for the src
     current_idents <+ pipe_channel {|x| [x.src, 0] unless check_exists.length > 0 } 
-
   end
 
   bloom :process do
@@ -48,7 +51,7 @@ module FIFODelivery
     #stdio <~ [["tick #{current_ident {|i| i.ident}} at #{budtime}"]]
 
     # Find the next packet to add to pipe_chan (according to the counter for this specific sender)
-    current <= (intermediate * current_idents).pairs { |p, i| p if p.ident == i.ident and p.src == i.src} 
+    temp :current <= (intermediate * current_idents).pairs { |p, i| p if p.ident == i.ident and p.src == i.src} 
     pipe_chan <+ current
     
     # Remove from intermediate
