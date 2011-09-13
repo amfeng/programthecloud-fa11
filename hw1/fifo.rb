@@ -19,7 +19,8 @@ module FIFODelivery
     # them in order
     table :intermediate, [:dst, :src, :ident] => [:payload]
 
-    # Temporary "variable" for the current request chosen in order
+    # Temporary "variable" for the current request chosen in order for each
+    # src (dst as a primary is redundant for this receiver node)
     scratch :current, [:dst, :src] => [:ident, :payload]
 
     # Keep track of the counters for each src
@@ -42,7 +43,7 @@ module FIFODelivery
     # create it
     #stdio <~ [current_idents {|c| ["#{c.src}, #{c.ident}"]}, ["---"]]
 
-    # Find which src's are missing 
+    # Find which src's are missing from the counter table
     temp :missing <= pipe_channel.notin(current_idents, :src => :src) 
 
     # If it doesn't exist, append a new row for the src
@@ -55,11 +56,9 @@ module FIFODelivery
     #stdio <~ [["tick #{current_ident {|i| i.ident}} at #{budtime}"]]
 
     # Find the next packet to add to pipe_chan (according to the counter 
-    # for this specific sender)
+    # for this specific sender), and remove from intermediate
     current <= (intermediate * current_idents).lefts(:ident => :ident, :src => :src) 
     pipe_chan <+ current
-    
-    # Remove from intermediate
     intermediate <- current
 
     # Increment counter for this specific sender
