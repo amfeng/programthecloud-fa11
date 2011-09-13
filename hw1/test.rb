@@ -26,15 +26,23 @@ class TestFIFO < Test::Unit::TestCase
   end
 
   def workload2(fd)
-    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 3, "qux"] ] }
-    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 1, "bar"] ] }
-    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 0, "foo"] ] }
-    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 2, "baz"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 2, "qux"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 0, "bar"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 1, "foo"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:33333", 3, "baz"] ] }
+  end
+
+  def workload3(fd)
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:11111", 1, "qux"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:11111", 3, "bar"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:11111", 2, "foo"] ] }
+    fd.sync_do { fd.pipe_in <+ [ ["localhost:12345", "localhost:11111", 0, "baz"] ] }
   end
 
   def test_fifo
     sender_instance = FC.new(:port => 54321)
     sender_instance_2 = FC.new(:port => 33333)
+    sender_instance_3 = FC.new(:port => 11111)
     receiver_instance = FC.new(:port => 12345)
 
     sender_instance.run_bg
@@ -42,6 +50,7 @@ class TestFIFO < Test::Unit::TestCase
     receiver_instance.run_bg
     workload(sender_instance)
     workload2(sender_instance_2)
+    workload3(sender_instance_2)
     4.times {receiver_instance.sync_do}
     receiver_instance.sync_do do
       receiver_instance.timestamped.each do |t|
@@ -51,7 +60,7 @@ class TestFIFO < Test::Unit::TestCase
           end
         end
       end
-      assert_equal(8, receiver_instance.timestamped.length)
+      assert_equal(12, receiver_instance.timestamped.length)
     end
   end
 end
