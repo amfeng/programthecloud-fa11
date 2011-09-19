@@ -45,7 +45,20 @@ class TestLockMgr < Test::Unit::TestCase
       end
     end
 
-    # Trying to acquire a :S lock on a resource that another Xact has a :X lock on
+    # Trying to acquire a :X lock on a resource when 
+    # another Xact has a :S lock on it
+    # lm.sync_do { lm.request_lock <+ [ ["3", "A", "X"] ] }
+    # 2.times {lm.sync_do}
+
+    # lm.acquired_locks.each do |l|
+    #   if l.resource == "A"
+    #     assert_equal(l.xid, "1")
+    #     assert_equal(l.mode, "S")        
+    #   end
+    # end
+
+    # Trying to acquire a :S lock on a resource that 
+    # another Xact has a :X lock on
     # lm.sync_do { lm.request_lock <+ [ ["3", "B", "S"] ] }
     # 2.times {lm.sync_do}
 
@@ -59,7 +72,8 @@ class TestLockMgr < Test::Unit::TestCase
     # TODO: Clarify if a Xact has an exclusive lock, can it acquire
     # a shared lock. Will that result in a downgrade?
     
-    # Trying to acquire a :S lock on a resource when it already has a :X lock on it
+    # Trying to acquire a :S lock on a resource when 
+    # the same Xact already has a :X lock on it
     # lm.sync_do { lm.request_lock <+ [ ["2", "B", "S"] ] }
     # 2.times {lm.sync_do}
 
