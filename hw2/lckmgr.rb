@@ -9,7 +9,7 @@ module LockMgrProtocol
   end
 end
 
-module LockMgr
+module TwoPhaseLockMgr
   include LockMgrProtocol
 
   state do
