@@ -18,21 +18,18 @@ class Locker
 end
 
 class TestLockMgr < Test::Unit::TestCase
-  def workload(fd)
-    fd.sync_do { fd.request_lock <+ [ ["1", "A", "S"] ] }
-  end
-
   def test_lockmgr
     lm = Locker.new()
 
     lm.run_bg
-    workload(lm)
+    lm.sync_do { lm.request_lock <+ [ ["1", "A", "S"] ] }
     2.times {lm.sync_do}
 
     lm.acquired_locks.each do |l|
-      assert_equal(l.xid, "1")
-      assert_equal(l.resource, "A")
-      assert_equal(l.mode, "S")
+      if l.resource == "A"
+        assert_equal(l.xid, "1")
+        assert_equal(l.mode, "S")
+      end
     end
   end
 end
