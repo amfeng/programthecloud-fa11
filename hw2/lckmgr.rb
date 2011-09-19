@@ -9,13 +9,13 @@ module LockMgrProtocol
   end
 end
 
-module LockMgr
+module TwoPhaseLockMgr
   include LockMgrProtocol
 
   state do
     scratch :request_read, request_lock.schema
     scratch :request_write, request_lock.schema
-
+    
     table :read_queue, request_lock.schema 
     table :write_queue, request_lock.schema
 
