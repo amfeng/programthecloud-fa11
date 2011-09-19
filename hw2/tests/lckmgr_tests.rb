@@ -51,6 +51,17 @@ class TestLockMgr < Test::Unit::TestCase
     #     assert_equal(l.mode, "X")        
     #   end
     # end
+
+    # Lock upgrade
+    # lm.sync_do { lm.request_lock <+ [ ["1", "A", "X"] ] }
+    # 2.times {lm.sync_do}
+
+    # lm.acquired_locks.each do |l|
+    #   if l.resource == "A"
+    #     assert_equal(l.xid, "1")
+    #     assert_equal(l.mode, "X")        
+    #   end
+    # end
   end
 end
 

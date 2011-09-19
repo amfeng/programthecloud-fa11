@@ -34,6 +34,7 @@ module TwoPhaseLockMgr
     
     # FIXME: Delete this
     temp :allow_readreq <= (request_lock.select { |r| r.mode == "S" })
+
     request_read <+ allow_readreq
     read_queue <- allow_readreq
 
@@ -42,7 +43,7 @@ module TwoPhaseLockMgr
     # Allowing writes (:X lock)
     
     # FIXME: Throws an error saying undefined method 'group' for #<Array>
-    # temp :allow_writereq <= (request_lock.select { |r| r.mode == :X } << write_queue).group(:resource, choose(:xid))
+    # temp :allow_writereq <= (request_lock.select { |r| r.mode == "X" } << write_queue).group(:resource, choose(:xid))
     
     # FIXME: Delete this
     temp :allow_writereq <= (request_lock.select { |r| r.mode == "X" })
