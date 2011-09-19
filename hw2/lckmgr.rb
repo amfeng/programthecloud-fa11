@@ -28,14 +28,26 @@ module TwoPhaseLockMgr
   # Only allow one request per resource in at a time, for consistency
   bloom :gatekeeper do
     # Allowing reads (:S lock)
-    temp :allow_readreq <= (request_lock.select { |r| r.mode == :S } << read_queue).group(:resource, choose(:xid))
+
+    # FIXME: Throws an error saying undefined method 'group' for #<Array>
+    # temp :allow_readreq <= (request_lock.select { |r| r.mode == :S } << read_queue).group(:resource, choose(:xid))
+    
+    # FIXME: Delete this
+    temp :allow_readreq <= (request_lock.select { |r| r.mode == :S })
+                            
     request_read <+ allow_readreq
     read_queue <- allow_readreq
 
     read_queue <+ request_lock.notin(allow_readreq)
 
     # Allowing writes (:X lock)
-    temp :allow_writereq <= (request_lock.select { |r| r.mode == :X } << write_queue).group(:resource, choose(:xid))
+    
+    # FIXME: Throws an error saying undefined method 'group' for #<Array>
+    # temp :allow_writereq <= (request_lock.select { |r| r.mode == :X } << write_queue).group(:resource, choose(:xid))
+    
+    # FIXME: Delete this
+    temp :allow_writereq <= (request_lock.select { |r| r.mode == :X })
+
     request_write <+ allow_writereq
     read_queue <- allow_writereq
 
