@@ -23,12 +23,18 @@ class TestLockMgr < Test::Unit::TestCase
 
     lm.run_bg
     lm.sync_do { lm.request_lock <+ [ ["1", "A", "S"] ] }
+    lm.sync_do { lm.request_lock <+ [ ["2", "B", "X"] ] }
     2.times {lm.sync_do}
 
     lm.acquired_locks.each do |l|
       if l.resource == "A"
         assert_equal(l.xid, "1")
         assert_equal(l.mode, "S")
+      end
+
+      if l.resource == "B"
+        assert_equal(l.xid, "2")
+        assert_equal(l.mode, "X")        
       end
     end
   end
