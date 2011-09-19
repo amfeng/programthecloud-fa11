@@ -25,32 +25,33 @@ module TwoPhaseLockMgr
     scratch :write_locks, [:resource]
   end
 
-  # Only allow one request per resource in at a time, for consistency
+  # Some locks have restrictions on the number of locks on a resource,
+  # so doesn't make sense to process more than the allowed amount
   bloom :gatekeeper do
     # Allowing reads (:S lock)
 
-    # FIXME: Throws an error saying undefined method 'group' for #<Array>
-    # temp :allow_readreq <= (request_lock.select { |r| r.mode == "S" } << read_queue).group(:resource, choose(:xid))
-    
-    # FIXME: Delete this
-    temp :allow_readreq <= (request_lock.select { |r| r.mode == "S" })
-    request_read <+ allow_readreq
-    read_queue <- allow_readreq
+    # Add shared lock requests coming in to the read queue
+    read_queue <+ request_lock.select { |r| r.mode == "S" } 
 
-    read_queue <+ request_lock.notin(allow_readreq)
+    # No restrictions on how many shared locks allowed on a resource
+    # at once (unless there's an exclusive lock), we'll let them all
+    # in for processing
+    request_read <+ read_queue
+    read_queue <- read_queue
 
     # Allowing writes (:X lock)
     
-    # FIXME: Throws an error saying undefined method 'group' for #<Array>
-    # temp :allow_writereq <= (request_lock.select { |r| r.mode == :X } << write_queue).group(:resource, choose(:xid))
-    
-    # FIXME: Delete this
-    temp :allow_writereq <= (request_lock.select { |r| r.mode == "X" })
+    # Add exclusive lock requests coming in to the read queue
+    write_queue <+ request_lock.select { |r| r.mode == "X" } 
+   
+    # At most 1 exclusive lock per resource at a time, so we'll choose one per 
+    # resource to process
+    temp :allow_writereq <= write_queue.group([:resource], choose(:xid))
 
     request_write <+ allow_writereq
-    read_queue <- allow_writereq
+    write_queue <- allow_writereq
 
-    read_queue <+ request_lock.notin(allow_readreq)
+    write_queue <+ request_lock.notin(allow_writereq)
   end
 
   # For each read request that comes in, check if we can grant the lock:
