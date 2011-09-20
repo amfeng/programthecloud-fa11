@@ -19,7 +19,10 @@ module TwoPhaseLockMgr
     table :read_queue, request_lock.schema 
     table :write_queue, request_lock.schema
 
-    table :locks, [:xid, :resource] => [:mode]
+    scratch :can_write, request_lock.schema
+    scratch :can_upgrade, request_lock.schema
+
+    table :locks, request_lock.schema
 
     # TODO: Better to keep redundant data or regenerate on the fly?
     scratch :write_locks, [:resource]
@@ -70,7 +73,7 @@ module TwoPhaseLockMgr
     temp :can_read <= request_read.notin(write_locks, :resource => :resource) 
     #stdio <~ write_locks.inspected
     #stdio <~ request_read.inspected
-    stdio <~ locks.inspected
+    #stdio <~ locks.inspected
     #stdio <~ can_read.inspected
 
     locks <+ can_read
@@ -84,16 +87,20 @@ module TwoPhaseLockMgr
   bloom :process_write do
     # Can grant write lock if currently no other locks on the resource held
     # by any other transaction
-    temp :can_write <= request_write.notin(locks, :resource => :resource) 
+    can_write <= request_write.notin(locks, :resource => :resource) 
     #{ |r, l| true if r.xid != l.xid }
+    can_upgrade <= (request_write * locks).lefts(:resource => :resource, :xid => :xid)
+    #stdio <~ can_upgrade.inspected 
     #stdio <~ can_write.inspected
+    #stdio <~ request_write.inspected
  
-    locks <+- can_write
+    locks <+ can_write
+    # Replace any other locks for this resource/xid with :X lock
+    locks <+- can_upgrade
 
-    # Remove any shared locks if upgrading from S to X
-    # locks <- can_write  
     #stdio <~ locks.inspected
 
+    # TODO: Remove from write_queue if not in can_upgrade as well
     write_queue <+ request_write.notin(can_write)
   end
 
@@ -102,7 +109,7 @@ module TwoPhaseLockMgr
   bloom :remove_locks do
     locks <- (locks * end_xact).lefts(:xid => :xid)
 
-    # Remove pending locks as well, in case a transaction ended abruptly
+    # TODO: Remove pending locks as well, in case a transaction ended abruptly
     # before getting all of the locks
   end
 end

@@ -8,7 +8,7 @@ class Locker
   include TwoPhaseLockMgr 
 
   state do
-    table :acquired_locks, [:xid, :resource, :mode]
+    table :acquired_locks, [:xid, :resource] => [:mode]
   end
 
   bloom do
@@ -39,7 +39,7 @@ class TestLockMgr < Test::Unit::TestCase
         assert_equal(l.mode, :S)
       end
     end
-    assert_equal(@lm.acquired_locks.length, 1)
+    assert_equal(@lm.locks.length, 1)
   end
 
   def test_sharedlock_bad
@@ -55,7 +55,6 @@ class TestLockMgr < Test::Unit::TestCase
         assert_equal(l.mode, :X)        
       end
     end
-    puts @lm.acquired_locks.inspected
     assert_equal(@lm.acquired_locks.length, 1)
   end
 
@@ -126,7 +125,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.acquired_locks.each do |l|
       if l.resource == "D"
         assert_equal(l.xid, "6")
-        assert_equal(l.mode, "X")        
+        assert_equal(l.mode, :X)        
       end
     end
   end
@@ -135,15 +134,17 @@ class TestLockMgr < Test::Unit::TestCase
     # Lock upgrade
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :S] ] }
     tick
-    @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :S] ] }
-    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :X] ] }
+    tick(3)
 
+    puts @lm.acquired_locks.inspected
     @lm.acquired_locks.each do |l|
       if l.resource == "E"
         assert_equal(l.xid, "7")
-        assert_equal(l.mode, :S)        
+        assert_equal(l.mode, :X)        
       end
     end
+    assert_equal(@lm.acquired_locks.length, 1)
 
     # Lock upgrade cannot happen if multiple Xacts have a :S lock
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :S ] ]}
