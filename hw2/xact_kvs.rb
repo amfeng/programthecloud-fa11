@@ -20,16 +20,15 @@ module TwoPLTransactionalKVS
 
   # Perform the puts
   bloom :mutate do
-    request_lock <+ xput {|x| [x.xid, x.key, ":X"]}
-    bed.kvput <+ (xput * lock_status).lefts(:xid => :xid, :key => :resource) 
+    request_lock <+ xput {|x| [x.xid, x.key, :X]}
+    bkvs.kvput <+ (xput * lock_status).lefts(:xid => :xid, :key => :resource) 
     # Not sure how to populate xput_response
-
   end
 
   # Perform the gets
   bloom :get do
-    request_lock <+ xget {|x| [x.xid, x.key, ":S"]}
-    bed.kvget <+ (xget * lock_status).lefts(:xid => :reqid, :key => :resource)
-    xget_response <+ bed.kvget_response {|x| [x.xid, x.key, x.xid, x.value]}
+    request_lock <+ xget {|x| [x.xid, x.key, :S]}
+    bkvs.kvget <+ (xget * lock_status).lefts(:xid => :xid, :key => :resource)
+    xget_response <+ bkvs.kvget_response {|x| [x.xid, x.key, x.xid, x.value]}
   end
 end
