@@ -20,7 +20,7 @@ module TwoPhaseLockMgr
     table :write_queue, [:xid, :resource] => [:mode]
 
     scratch :can_write, [:xid, :resource] => [:mode]
-    scratch :can_upgrade, [:xid, :resource] => [:mode]
+    scratch :without_dups, [:xid, :resource] => [:mode]
 
     table :locks, [:xid, :resource] => [:mode]
 
@@ -28,33 +28,43 @@ module TwoPhaseLockMgr
     scratch :write_locks, [:resource]
   end
 
+  bloom :debug do
+    #stdio <~ [["tick #{budtime}"]]
+    #stdio <~ read_queue.inspected
+    #stdio <~ request_read.inspected
+    #stdio <~ write_queue.inspected
+    #stdio <~ allow_writereq.inspected
+
+    #stdio <~ write_locks.inspected
+    #stdio <~ request_read.inspected
+    #stdio <~ locks.inspected
+    #stdio <~ can_read.inspected
+
+    #stdio <~ can_upgrade.inspected 
+    #stdio <~ can_write.inspected
+    #stdio <~ request_write.inspected
+    #stdio <~ locks.inspected
+
+  end
+
   # Some locks have restrictions on the number of locks on a resource,
   # so doesn't make sense to process more than the allowed amount
   bloom :gatekeeper do
-    stdio <~ [["tick #{budtime}"]]
-    # Allowing reads (:S lock)
-
     # Add shared lock requests coming in to the read queue
     read_queue <+ request_lock.select { |r| r.mode == :S } 
-    #stdio <~ read_queue.inspected
 
     # No restrictions on how many shared locks allowed on a resource
     # at once (unless there's an exclusive lock), we'll let them all
     # in for processing
     request_read <+ read_queue
     read_queue <- read_queue
-    #stdio <~ request_read.inspected
 
-    # Allowing writes (:X lock)
-    
     # Add exclusive lock requests coming in to the read queue
     write_queue <+ request_lock.select { |r| r.mode == :X } 
-    #stdio <~ write_queue.inspected
    
     # At most 1 exclusive lock per resource at a time, so we'll choose one per 
     # resource to process
     temp :allow_writereq <= write_queue.group([:resource, :mode], choose(:xid))
-    #stdio <~ allow_writereq.inspected
 
     # Reorder columns because they got messed up in the grouping
     request_write <+ allow_writereq {|r| [r[2], r[0], r[1]] }
@@ -71,14 +81,13 @@ module TwoPhaseLockMgr
     # Don't downgrade lock; if already have X lock on a resource, ignore any S
     # lock requests
     temp :can_read <= request_read.notin(write_locks, :resource => :resource) 
-    #stdio <~ write_locks.inspected
-    #stdio <~ request_read.inspected
-    #stdio <~ locks.inspected
-    #stdio <~ can_read.inspected
 
     locks <+ can_read
 
-    # TODO: If already have X lock, remove redundant S lock request from read_queue 
+    # TODO: If already have X lock, remove redundant S lock request from read_queue
+    # and send OK lock_status
+
+    # Reroute the read lock requests we couldn't grant back into the queue
     read_queue <+ request_read.notin(can_read)
    end
 
@@ -87,14 +96,15 @@ module TwoPhaseLockMgr
   bloom :process_write do
     # Can grant write lock if currently no other locks on the resource held
     # by any other transaction
-    can_write <= request_write.notin(locks, :resource => :resource) { |r, l| true if r.xid != l.xid }
-    #stdio <~ can_upgrade.inspected 
-    stdio <~ can_write.inspected
-    #stdio <~ request_write.inspected
- 
-    locks <+- can_write
-    #stdio <~ locks.inspected
 
+    # Ignore locks that have the same resource and xid as one's we're requesting for,
+    # we will be upgrading these locks
+    without_dups <= locks.notin(request_write, :resource => :resource, :xid => :xid)
+    can_write <= request_write.notin(without_dups, :resource => :resource) 
+
+    locks <+- can_write
+
+    # Reroute the write lock requests we couldn't grant back into the queue
     write_queue <+ request_write.notin(can_write)
   end
 

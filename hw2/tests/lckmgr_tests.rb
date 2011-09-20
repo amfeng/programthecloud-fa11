@@ -151,7 +151,6 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :X] ] }
     tick
 
-    puts @lm.locks.inspected
     acquiredLocks = Array.new
     @lm.locks.each do |l|
       if l.resource == "F"
@@ -218,7 +217,6 @@ class TestLockMgr < Test::Unit::TestCase
 
     @lm.sync_do { @lm.end_xact <+ [ ["16"] ] }
     tick
-    puts @lm.locks.inspected
     @lm.sync_do { @lm.request_lock <+ [ ["17", "I", :X] ] }
     tick
 
