@@ -19,7 +19,7 @@ module TwoPLTransactionalKVS
 
   state do
     table :put_queue, [:xid, :key, :reqid] => [:data]
-    table :get_queue, [:xid, :key, :reqid] => [:data]
+    table :get_queue, [:xid, :key, :reqid]
   end
 
   # Perform the puts
@@ -49,7 +49,7 @@ module TwoPLTransactionalKVS
     get_queue <= xget
 
     # Once we have obtained the lock, send the get request to basickvs
-    kvget <= (get_queue * lock_status).lefts(:xid => :xid, :key => :resource)
+    kvget <= (get_queue * lock_status).lefts(:xid => :xid, :key => :resource) {|get| [get.reqid, get.key]}
     
     # Update xget_response to indicate that we are done
     xget_response <= (kvget_response * get_queue).pairs(:key => :key) {|resp, get| [get.xid, resp.key, resp.reqid, resp.value]}
