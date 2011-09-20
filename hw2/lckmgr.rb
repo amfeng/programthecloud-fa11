@@ -32,7 +32,7 @@ module TwoPhaseLockMgr
     # Allowing reads (:S lock)
 
     # Add shared lock requests coming in to the read queue
-    read_queue <+ request_lock.select { |r| r.mode == "S" } 
+    read_queue <+ request_lock.select { |r| r.mode == :S } 
     #stdio <~ read_queue.inspected
 
     # No restrictions on how many shared locks allowed on a resource
@@ -45,7 +45,7 @@ module TwoPhaseLockMgr
     # Allowing writes (:X lock)
     
     # Add exclusive lock requests coming in to the read queue
-    write_queue <+ request_lock.select { |r| r.mode == "X" } 
+    write_queue <+ request_lock.select { |r| r.mode == :X } 
     #stdio <~ write_queue.inspected
    
     # At most 1 exclusive lock per resource at a time, so we'll choose one per 
@@ -63,14 +63,14 @@ module TwoPhaseLockMgr
   bloom :process_read do
     # Can grant read lock if currently no write locks on the resource held by 
     # any other transaction
-    write_locks <= locks { |l| l if l.mode == :X }
+    write_locks <= locks { |l| [l.resource] if l.mode == :X }
 
     # Don't downgrade lock; if already have X lock on a resource, ignore any S
     # lock requests
     temp :can_read <= request_read.notin(write_locks, :resource => :resource) 
     #stdio <~ write_locks.inspected
     #stdio <~ request_read.inspected
-    #stdio <~ locks.inspected
+    stdio <~ locks.inspected
     #stdio <~ can_read.inspected
 
     locks <+ can_read
@@ -84,14 +84,15 @@ module TwoPhaseLockMgr
   bloom :process_write do
     # Can grant write lock if currently no other locks on the resource held
     # by any other transaction
-    temp :can_write <= request_write.notin(locks, :resource => :resource) { |r, l| true if r.xid != l.xid }
+    temp :can_write <= request_write.notin(locks, :resource => :resource) 
+    #{ |r, l| true if r.xid != l.xid }
     #stdio <~ can_write.inspected
  
     locks <+- can_write
 
     # Remove any shared locks if upgrading from S to X
     # locks <- can_write  
-    stdio <~ locks.inspected
+    #stdio <~ locks.inspected
 
     write_queue <+ request_write.notin(can_write)
   end
