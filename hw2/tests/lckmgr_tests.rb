@@ -24,10 +24,14 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.run_bg
   end
 
+  def tick(n = 3)
+    n.times { @lm.sync_do }
+  end
+
   def test_sharedlock_ok
     # Acquire a shared lock
     @lm.sync_do { @lm.request_lock <+ [ ["1", "A", :S] ] }
-    3.times {@lm.sync_do}
+    tick
 
     @lm.acquired_locks.each do |l|
       if l.resource == "A"
@@ -43,7 +47,7 @@ class TestLockMgr < Test::Unit::TestCase
     # another Xact has a :X lock on
     @lm.sync_do { @lm.request_lock <+ [ ["2", "B", :X] ] }
     @lm.sync_do { @lm.request_lock <+ [ ["3", "B", :S] ] }
-    3.times {@lm.sync_do}
+    tick
 
     @lm.acquired_locks.each do |l|
       if l.resource == "B"
@@ -58,7 +62,7 @@ class TestLockMgr < Test::Unit::TestCase
   def test_exclusivelock_ok
     # Acquire an exclusive lock
     @lm.sync_do { @lm.request_lock <+ [ ["2", "B", :X] ] }
-    3.times {@lm.sync_do}
+    tick
 
     @lm.acquired_locks.each do |l|
       if l.resource == "B"
@@ -72,10 +76,10 @@ class TestLockMgr < Test::Unit::TestCase
   def test_exclusivelock_bad
     # Trying to acquire a :X lock on a resource when 
     # another Xact has a :S lock on it
-    @lm.sync_do { @lm.request_lock <+ [ ["3", "B", :S] ] }
-    3.times {@lm.sync_do}
+    @lm.sync_do { @lm.request_lock <+ [ ["1", "A", :S] ] }
+    tick
     @lm.sync_do { @lm.request_lock <+ [ ["3", "A", :X] ] }
-    3.times {@lm.sync_do}
+    tick
 
     @lm.acquired_locks.each do |l|
       if l.resource == "A"
@@ -90,9 +94,9 @@ class TestLockMgr < Test::Unit::TestCase
   def test_sharedlocks_ok
     # Multiple Xacts can acquire a shared lock on a resource
     @lm.sync_do { @lm.request_lock <+ [ ["4", "C", :S] ] }
-    3.times {@lm.sync_do}
+    tick
     @lm.sync_do { @lm.request_lock <+ [ ["5", "C", :S] ] }
-    3.times {@lm.sync_do}
+    tick
 
     acquiredLocks = Array.new
     @lm.acquired_locks.each do |l|
@@ -108,63 +112,62 @@ class TestLockMgr < Test::Unit::TestCase
     assert_equal(acquiredLocks.length, 2)
   end
 
-  def rest
+  def test_downgrade
     # TODO: Clarify if a Xact has an exclusive lock, can it acquire
     # a shared lock. Will that result in a downgrade?
-    
+  
     # Trying to acquire a :S lock on a resource when 
     # the same Xact already has a :X lock on it
-    # @lm.sync_do { lm.request_lock <+ [ ["6", "D", "X"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["6", "D", "S"] ] }
-    # 2.times {@lm.sync_do}
+    @lm.sync_do { @lm.request_lock <+ [ ["6", "D", :X] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["6", "D", :S] ] }
+    tick
 
-    # @lm.acquired_locks.each do |l|
-    #   if l.resource == "D"
-    #     assert_equal(l.xid, "6")
-    #     assert_equal(l.mode, "X")        
-    #   end
-    # end
+    @lm.acquired_locks.each do |l|
+      if l.resource == "D"
+        assert_equal(l.xid, "6")
+        assert_equal(l.mode, "X")        
+      end
+    end
+  end
 
+  def test_upgrade
     # Lock upgrade
-    # @lm.sync_do { lm.request_lock <+ [ ["7", "E", "S"] ] }
-    # 2.times {@lm.sync_do}
+    @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :S] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :S] ] }
+    tick
 
-    # @lm.acquired_locks.each do |l|
-    #   if l.resource == "E"
-    #     assert_equal(l.xid, "7")
-    #     assert_equal(l.mode, "S")        
-    #   end
-    # end
-
-    # @lm.sync_do { lm.request_lock <+ [ ["7", "E", "X"] ] }
-    # 2.times {@lm.sync_do}
-
-    # @lm.acquired_locks.each do |l|
-    #   if l.resource == "E"
-    #     assert_equal(l.xid, "7")
-    #     assert_equal(l.mode, "X")        
-    #   end
-    # end
+    @lm.acquired_locks.each do |l|
+      if l.resource == "E"
+        assert_equal(l.xid, "7")
+        assert_equal(l.mode, :S)        
+      end
+    end
 
     # Lock upgrade cannot happen if multiple Xacts have a :S lock
-    # @lm.sync_do { lm.request_lock <+ [ ["8", "F", "S"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["9", "F", "S"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["8", "F", "X"] ] }
-    # 2.times {@lm.sync_do}
+    @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :S ] ]}
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["9", "F", :S] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :X] ] }
+    tick
 
-    # acquiredLocks = Array.new
-    # @lm.acquired_locks.each do |l|
-    #   if l.resource == "F"
-    #     assert_equal(l.mode, "S")        
-    #     assert(["8", "9"].include?(l.xid))        
-    #     acquiredLocks << l.xid
-    #   end
-    # end
-    # acquiredLocks.sort!
-    # assert_equals(acquiredLocks.at(0), "8")
-    # assert_equals(acquiredLocks.at(1), "9")
-    # assert_equals(acquiredLocks.length, 2)
+    acquiredLocks = Array.new
+    @lm.acquired_locks.each do |l|
+      if l.resource == "F"
+        assert_equal(l.mode, :S)        
+        assert(["8", "9"].include?(l.xid))        
+        acquiredLocks << l.xid
+      end
+    end
+    acquiredLocks.sort!
+    assert_equal(acquiredLocks.at(0), "8")
+    assert_equal(acquiredLocks.at(1), "9")
+    assert_equal(acquiredLocks.length, 2)
+  end
 
+  def rest
     # Acquire a :X lock, end Xact, acquire a :S lock
     # @lm.sync_do { lm.request_lock <+ [ ["10", "G", "X"] ] }
     # 2.times {@lm.sync_do}
