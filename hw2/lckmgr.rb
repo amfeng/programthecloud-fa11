@@ -16,19 +16,20 @@ module TwoPhaseLockMgr
     scratch :request_read, [:xid, :resource] => [:mode]
     scratch :request_write, [:xid, :resource] => [:mode]
     
+    # TODO: Better to keep redundant data or regenerate on the fly?
+    scratch :write_locks, [:resource]
+
     table :read_queue, [:xid, :resource] => [:mode]
     table :write_queue, [:xid, :resource] => [:mode]
     scratch :continuing_write_queue, [:xid, :resource] => [:mode]
 
-    scratch :ended_xacts, [:xid]
     scratch :can_read, [:xid, :resource] => [:mode]
     scratch :can_write, [:xid, :resource] => [:mode]
-    scratch :without_dups, [:xid, :resource] => [:mode]
+    scratch :unique_locks, [:xid, :resource] => [:mode]
 
     table :locks, [:xid, :resource] => [:mode]
 
-    # TODO: Better to keep redundant data or regenerate on the fly?
-    scratch :write_locks, [:resource]
+    scratch :ended_xacts, [:xid]
   end
 
   bloom :debug do
@@ -103,8 +104,8 @@ module TwoPhaseLockMgr
 
     # Ignore locks that have the same resource and xid as one's we're requesting for,
     # we will be upgrading these locks
-    without_dups <= locks.notin(request_write, :resource => :resource, :xid => :xid)
-    can_write <= request_write.notin(without_dups, :resource => :resource) 
+    unique_locks <= locks.notin(request_write, :resource => :resource, :xid => :xid)
+    can_write <= request_write.notin(unique_locks, :resource => :resource) 
 
     # FIXME: Possible bug, write lock adds deferred until next timestamp, read lock
     # checking checks locks as of NOW
