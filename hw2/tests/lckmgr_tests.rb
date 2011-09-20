@@ -239,8 +239,8 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["19", "J", :S] ] }
     tick
 
-    puts @lm.locks.inspected
-    puts "--"
+    #puts @lm.locks.inspected
+    #puts "--"
     assert_equal(@lm.locks.length, 3)
     assert_equal(@lm.write_queue.length, 1)
     assert_equal(@lm.read_queue.length, 1)
