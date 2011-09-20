@@ -70,29 +70,18 @@ class TestLockMgr < Test::Unit::TestCase
     assert_equal(@lm.locks.length, 1)
   end
 
-  def test_exclusivelock_bad
-    # Trying to acquire a :X lock on a resource when 
-    # another Xact has a :S lock on it
-    @lm.sync_do { @lm.request_lock <+ [ ["1", "A", :S] ] }
-    tick
-    @lm.sync_do { @lm.request_lock <+ [ ["3", "A", :X] ] }
+  def test_locks_bad
+    # Can't have both a shared and exclusive lock on a resource
+    @lm.sync_do { @lm.request_lock <+ [ ["1", "A", :S], ["3", "A", :X] ] }
     tick
 
-    @lm.locks.each do |l|
-      if l.resource == "A"
-        assert_equal(l.xid, "1")
-        assert_equal(l.mode, :S)        
-      end
-    end
-    #puts @lm.locks.inspected
     assert_equal(@lm.locks.length, 1)
+    assert(@lm.write_queue.length + @lm.read_queue.length == 1)
   end
 
-  def test_sharedlocks_ok
+  def test_locks_ok
     # Multiple Xacts can acquire a shared lock on a resource
-    @lm.sync_do { @lm.request_lock <+ [ ["4", "C", :S] ] }
-    tick
-    @lm.sync_do { @lm.request_lock <+ [ ["5", "C", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["4", "C", :S],["5", "C", :S] ] }
     tick
 
     acquiredLocks = Array.new
@@ -116,7 +105,6 @@ class TestLockMgr < Test::Unit::TestCase
     # Trying to acquire a :S lock on a resource when 
     # the same Xact already has a :X lock on it
     @lm.sync_do { @lm.request_lock <+ [ ["6", "D", :X] ] }
-    tick
     @lm.sync_do { @lm.request_lock <+ [ ["6", "D", :S] ] }
     tick
 
@@ -131,7 +119,6 @@ class TestLockMgr < Test::Unit::TestCase
   def test_upgrade
     # Lock upgrade
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :S] ] }
-    tick
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :X] ] }
     tick
 
@@ -144,10 +131,7 @@ class TestLockMgr < Test::Unit::TestCase
     assert_equal(@lm.locks.length, 1)
 
     # Lock upgrade cannot happen if multiple Xacts have a :S lock
-    @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :S ] ]}
-    tick
-    @lm.sync_do { @lm.request_lock <+ [ ["9", "F", :S] ] }
-    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :S ], ["9", "F", :S] ] }
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :X] ] }
     tick
 
@@ -168,9 +152,7 @@ class TestLockMgr < Test::Unit::TestCase
   def test_releaselock_simple
     # Acquire a :X lock, end Xact, acquire a :S lock
     @lm.sync_do { @lm.request_lock <+ [ ["10", "G", :X] ] }
-    tick
     @lm.sync_do { @lm.end_xact <+ [ ["10"] ] }
-    tick
     @lm.sync_do { @lm.request_lock <+ [ ["11", "G", :S] ] }
     tick
 
@@ -186,12 +168,9 @@ class TestLockMgr < Test::Unit::TestCase
     # Acquire many :S locks, end one Xact 
     # Try to acquire a :X lock - fails
     # Try to acquire a :S lock - succeeds
-    @lm.sync_do { @lm.request_lock <+ [ ["12", "H", :S] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["13", "H", :S] ] }
-    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["12", "H", :S], ["13", "H", :S] ] }
     @lm.sync_do { @lm.end_xact <+ [ ["12"] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["14", "H", :X] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["15", "H", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["14", "H", :X],["15", "H", :S] ] }
     tick
 
     acquiredLocks = Array.new
@@ -211,12 +190,8 @@ class TestLockMgr < Test::Unit::TestCase
 
   def test_releaselock_upgrade
     # End Xact and perform a Lock upgrade
-    @lm.sync_do { @lm.request_lock <+ [ ["16", "I", :S] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["17", "I", :S] ] }
-    tick
-
+    @lm.sync_do { @lm.request_lock <+ [ ["16", "I", :S], ["17", "I", :S] ] }
     @lm.sync_do { @lm.end_xact <+ [ ["16"] ] }
-    tick
     @lm.sync_do { @lm.request_lock <+ [ ["17", "I", :X] ] }
     tick
 
@@ -230,13 +205,8 @@ class TestLockMgr < Test::Unit::TestCase
 
   def test_suddenend
     # End a Xact when it still has pending locks 
-    @lm.sync_do { @lm.request_lock <+ [ ["18", "I", :S] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :S] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["19", "J", :X] ] }
-    tick
-    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :X] ] }
-    tick
-    @lm.sync_do { @lm.request_lock <+ [ ["19", "J", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["18", "I", :S], ["19", "I", :S], ["19", "J", :X] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :X], ["19", "J", :S] ] }
     tick
 
     #puts @lm.locks.inspected
@@ -254,7 +224,6 @@ class TestLockMgr < Test::Unit::TestCase
         assert_equal(l.mode, :S)        
       end
     end
-    puts @lm.locks.inspected
     assert_equal(@lm.locks.length, 1)
     assert_equal(@lm.write_queue.length, 0)
     assert_equal(@lm.read_queue.length, 0)
