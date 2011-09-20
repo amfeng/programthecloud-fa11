@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'bud'
-require 'kvs.rb'
-require 'lckmgr.rb'
+require 'kvs/kvs'
+require '../lckmgr'
 
 module XactKVSProtocol
   state do
@@ -12,7 +12,7 @@ module XactKVSProtocol
   end
 end
 
-module XactKVSProtocol
+module TwoPLTransactionalKVS
   include XactKVSProtocol
   include TwoPhaseLockMgr
   # FIXME: Not sure if I should be importing or including. Thoughts?
