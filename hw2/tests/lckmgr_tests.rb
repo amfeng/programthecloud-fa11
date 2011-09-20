@@ -135,7 +135,6 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :X] ] }
     tick(3)
 
-    puts @lm.locks.inspected
     @lm.locks.each do |l|
       if l.resource == "E"
         assert_equal(l.xid, "7")
@@ -152,6 +151,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :X] ] }
     tick
 
+    puts @lm.locks.inspected
     acquiredLocks = Array.new
     @lm.locks.each do |l|
       if l.resource == "F"
@@ -166,61 +166,68 @@ class TestLockMgr < Test::Unit::TestCase
     assert_equal(acquiredLocks.length, 2)
   end
 
-  def rest
+  def test_releaselock_simple
     # Acquire a :X lock, end Xact, acquire a :S lock
-    # @lm.sync_do { lm.request_lock <+ [ ["10", "G", "X"] ] }
-    # 2.times {@lm.sync_do}
-    # @lm.sync_do { lm.end_xact <+ [ ["10"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["11", "G", "S"] ] }
-    # 2.times {@lm.sync_do}
+    @lm.sync_do { @lm.request_lock <+ [ ["10", "G", :X] ] }
+    tick
+    @lm.sync_do { @lm.end_xact <+ [ ["10"] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["11", "G", :S] ] }
+    tick
 
-    # @lm.locks.each do |l|
-    #   if l.resource == "G"
-    #     assert_equal(l.mode, "S")        
-    #     assert_equal(l.xid, "11")        
-    #   end
-    # end
+    @lm.locks.each do |l|
+      if l.resource == "G"
+        assert_equal(l.mode, :S)        
+        assert_equal(l.xid, "11")        
+      end
+    end
+  end
 
+  def test_releaselock 
     # Acquire many :S locks, end one Xact 
     # Try to acquire a :X lock - fails
     # Try to acquire a :S lock - succeeds
-    # @lm.sync_do { lm.request_lock <+ [ ["12", "H", "S"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["13", "H", "S"] ] }
-    # 2.times {@lm.sync_do}
-    # @lm.sync_do { lm.end_xact <+ [ ["12"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["14", "H", "X"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["15", "H", "S"] ] }
-    # 2.times {@lm.sync_do}
+    @lm.sync_do { @lm.request_lock <+ [ ["12", "H", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["13", "H", :S] ] }
+    tick
+    @lm.sync_do { @lm.end_xact <+ [ ["12"] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["14", "H", :X] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["15", "H", :S] ] }
+    tick
 
-    # acquiredLocks = Array.new
-    # @lm.locks.each do |l|
-    #   if l.resource == "H"
-    #     assert_equal(l.mode, "S")        
-    #     assert(["13", "15"].include?(l.xid))        
-    #     acquiredLocks << l.xid
-    #   end
-    # end
+    acquiredLocks = Array.new
+    @lm.locks.each do |l|
+      if l.resource == "H"
+        assert_equal(l.mode, :S)        
+        assert(["13", "15"].include?(l.xid))        
+        acquiredLocks << l.xid
+      end
+    end
 
-    # acquiredLocks.sort!
-    # assert_equals(acquiredLocks.at(0), "13")
-    # assert_equals(acquiredLocks.at(1), "15")
-    # assert_equals(acquiredLocks.length, 2)
+    acquiredLocks.sort!
+    assert_equal(acquiredLocks.at(0), "13")
+    assert_equal(acquiredLocks.at(1), "15")
+    assert_equal(acquiredLocks.length, 2)
+  end
 
-
+  def test_releaselock_upgrade
     # End Xact and perform a Lock upgrade
-    # @lm.sync_do { lm.request_lock <+ [ ["16", "I", "S"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["17", "I", "S"] ] }
-    # 2.times {@lm.sync_do}
-    # @lm.sync_do { lm.end_xact <+ [ ["16"] ] }
-    # @lm.sync_do { lm.request_lock <+ [ ["17", "I", "X"] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["16", "I", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["17", "I", :S] ] }
+    tick
 
-    # @lm.locks.each do |l|
-    #   if l.resource == "I"
-    #     assert_equal(l.xid, "17")
-    #     assert_equal(l.mode, "X")        
-    #   end
-    # end
+    @lm.sync_do { @lm.end_xact <+ [ ["16"] ] }
+    tick
+    puts @lm.locks.inspected
+    @lm.sync_do { @lm.request_lock <+ [ ["17", "I", :X] ] }
+    tick
 
+    @lm.locks.each do |l|
+      if l.resource == "I"
+        assert_equal(l.xid, "17")
+        assert_equal(l.mode, :X)        
+      end
+    end
   end
 end
 

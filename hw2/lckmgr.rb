@@ -13,14 +13,14 @@ module TwoPhaseLockMgr
   include LockMgrProtocol
 
   state do
-    scratch :request_read, request_lock.schema
-    scratch :request_write, request_lock.schema
+    scratch :request_read, [:xid, :resource] => [:mode]
+    scratch :request_write, [:xid, :resource] => [:mode]
     
-    table :read_queue, request_lock.schema 
-    table :write_queue, request_lock.schema
+    table :read_queue, [:xid, :resource] => [:mode]
+    table :write_queue, [:xid, :resource] => [:mode]
 
-    scratch :can_write, request_lock.schema
-    scratch :can_upgrade, request_lock.schema
+    scratch :can_write, [:xid, :resource] => [:mode]
+    scratch :can_upgrade, [:xid, :resource] => [:mode]
 
     table :locks, [:xid, :resource] => [:mode]
 
@@ -87,20 +87,14 @@ module TwoPhaseLockMgr
   bloom :process_write do
     # Can grant write lock if currently no other locks on the resource held
     # by any other transaction
-    can_write <= request_write.notin(locks, :resource => :resource)  
-    #{ |r, l| true if r.xid != l.xid }
-    can_upgrade <= (request_write * locks).lefts(:resource => :resource, :xid => :xid)
+    can_write <= request_write.notin(locks, :resource => :resource) { |r, l| true if r.xid != l.xid }
     #stdio <~ can_upgrade.inspected 
-    #stdio <~ can_write.inspected
+    stdio <~ can_write.inspected
     #stdio <~ request_write.inspected
  
-    locks <+ can_write
-    # Replace any other locks for this resource/xid with :X lock
-    locks <+- can_upgrade
-
+    locks <+- can_write
     #stdio <~ locks.inspected
 
-    # TODO: Remove from write_queue if not in can_upgrade as well
     write_queue <+ request_write.notin(can_write)
   end
 
