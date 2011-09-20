@@ -18,7 +18,9 @@ module TwoPhaseLockMgr
     
     table :read_queue, [:xid, :resource] => [:mode]
     table :write_queue, [:xid, :resource] => [:mode]
+    scratch :continuing_write_queue, [:xid, :resource] => [:mode]
 
+    scratch :ended_xacts, [:xid]
     scratch :can_read, [:xid, :resource] => [:mode]
     scratch :can_write, [:xid, :resource] => [:mode]
     scratch :without_dups, [:xid, :resource] => [:mode]
@@ -51,23 +53,24 @@ module TwoPhaseLockMgr
   # so doesn't make sense to process more than the allowed amount
   bloom :gatekeeper do
     # Add shared lock requests coming in to the read queue
-    read_queue <+ request_lock.select { |r| r.mode == :S } 
+    read_queue <= request_lock.select { |r| r.mode == :S } 
 
     # No restrictions on how many shared locks allowed on a resource
     # at once (unless there's an exclusive lock), we'll let them all
     # in for processing
-    request_read <+ read_queue
+    request_read <= read_queue.notin(ended_xacts, :xid => :xid)
     read_queue <- read_queue
 
     # Add exclusive lock requests coming in to the read queue
-    write_queue <+ request_lock.select { |r| r.mode == :X } 
+    write_queue <= request_lock.select { |r| r.mode == :X } 
    
     # At most 1 exclusive lock per resource at a time, so we'll choose one per 
     # resource to process
-    temp :allow_writereq <= write_queue.group([:resource, :mode], choose(:xid))
+    continuing_write_queue <= write_queue.notin(ended_xacts, :xid => :xid)
+    temp :allow_writereq <= continuing_write_queue.group([:resource, :mode], choose(:xid))
 
     # Reorder columns because they got messed up in the grouping
-    request_write <+ allow_writereq {|r| [r[2], r[0], r[1]] }
+    request_write <= allow_writereq {|r| [r[2], r[0], r[1]] }
     write_queue <- allow_writereq {|r| [r[2], r[0], r[1]] }
   end
 
@@ -103,6 +106,8 @@ module TwoPhaseLockMgr
     without_dups <= locks.notin(request_write, :resource => :resource, :xid => :xid)
     can_write <= request_write.notin(without_dups, :resource => :resource) 
 
+    # FIXME: Possible bug, write lock adds deferred until next timestamp, read lock
+    # checking checks locks as of NOW
     locks <+- can_write
     lock_status <= can_write { |w| [w.xid, w.resource, :OK] }
 
@@ -115,7 +120,10 @@ module TwoPhaseLockMgr
   bloom :remove_locks do
     locks <- (locks * end_xact).lefts(:xid => :xid)
 
-    # TODO: Remove pending locks as well, in case a transaction ended abruptly
+    # Remove pending locks as well, in case a transaction ended abruptly
     # before getting all of the locks
+    ended_xacts <=+ end_xact
+    write_queue <- (write_queue * end_xact).lefts(:xid => :xid)
+    read_queue <- (read_queue * end_xact).lefts(:xid => :xid)
   end
 end
