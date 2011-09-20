@@ -19,10 +19,11 @@ module TwoPLTransactionalKVS
 
   state do
     table :put_queue, [:xid, :key, :reqid] => [:data]
+    table :get_queue, [:xid, :key, :reqid] => [:data]
   end
 
   # Perform the puts
-  bloom :mutate do
+  bloom :pl_mutate do
     # Request a :X lock before performing the put
     request_lock <= xput {|x| [x.xid, x.key, :X]}
 
@@ -40,10 +41,21 @@ module TwoPLTransactionalKVS
   end
 
   # Perform the gets
-  bloom :get do
-    request_lock <+ xget {|x| [x.xid, x.key, :S]}
-    kvget <+ (xget * lock_status).lefts(:xid => :xid, :key => :resource)
-    xget_response <+ (kvget_response * xget).pairs(:key => :key) {|resp, get| [get.xid, resp.key, resp.reqid, resp.value]}
+  bloom :pl_get do
+    # Request a :S lock before the get
+    request_lock <= xget {|x| [x.xid, x.key, :S]}
+    
+    # Remeber that we wanted to do a get
+    get_queue <= xget
+
+    # Once we have obtained the lock, send the get request to basickvs
+    kvget <= (get_queue * lock_status).lefts(:xid => :xid, :key => :resource)
+    
+    # Update xget_response to indicate that we are done
+    xget_response <= (kvget_response * get_queue).pairs(:key => :key) {|resp, get| [get.xid, resp.key, resp.reqid, resp.value]}
+
+    # Remove the get request from get_queue
+    get_queue <- (get_queue * xget_response).lefts(:xid => :xid, :key => :key, :reqid => :reqid)
   end
 
   bloom :debug do
