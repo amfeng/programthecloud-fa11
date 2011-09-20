@@ -22,7 +22,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.run_bg
   end
 
-  def tick(n = 3)
+  def tick(n = 2)
     n.times { @lm.sync_do }
   end
 
@@ -133,7 +133,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :S] ] }
     tick
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :X] ] }
-    tick(3)
+    tick
 
     @lm.locks.each do |l|
       if l.resource == "E"
@@ -226,6 +226,38 @@ class TestLockMgr < Test::Unit::TestCase
         assert_equal(l.mode, :X)        
       end
     end
+  end
+
+  def test_suddenend
+    # End a Xact when it still has pending locks 
+    @lm.sync_do { @lm.request_lock <+ [ ["18", "I", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["19", "J", :X] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :X] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["19", "J", :S] ] }
+    tick
+
+    puts @lm.locks.inspected
+    puts "--"
+    assert_equal(@lm.locks.length, 3)
+    assert_equal(@lm.write_queue.length, 1)
+    assert_equal(@lm.read_queue.length, 1)
+
+    @lm.sync_do { @lm.end_xact <+ [ ["19"] ] }
+    tick
+
+    @lm.locks.each do |l|
+      if l.resource == "I"
+        assert_equal(l.xid, "18")
+        assert_equal(l.mode, :S)        
+      end
+    end
+    puts @lm.locks.inspected
+    assert_equal(@lm.locks.length, 1)
+    assert_equal(@lm.write_queue.length, 0)
+    assert_equal(@lm.read_queue.length, 0)
   end
 end
 
