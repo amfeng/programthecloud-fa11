@@ -8,11 +8,9 @@ class Locker
   include TwoPhaseLockMgr 
 
   state do
-    table :acquired_locks, [:xid, :resource] => [:mode]
   end
 
   bloom do
-    acquired_locks <= locks {|r| [r.xid, r.resource, r.mode]}
   end
 
 end
@@ -33,7 +31,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["1", "A", :S] ] }
     tick
 
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "A"
         assert_equal(l.xid, "1")
         assert_equal(l.mode, :S)
@@ -49,13 +47,13 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["3", "B", :S] ] }
     tick
 
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "B"
         assert_equal(l.xid, "2")
         assert_equal(l.mode, :X)        
       end
     end
-    assert_equal(@lm.acquired_locks.length, 1)
+    assert_equal(@lm.locks.length, 1)
   end
 
   def test_exclusivelock_ok
@@ -63,13 +61,13 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["2", "B", :X] ] }
     tick
 
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "B"
         assert_equal(l.xid, "2")
         assert_equal(l.mode, :X)        
       end
     end
-    assert_equal(@lm.acquired_locks.length, 1)
+    assert_equal(@lm.locks.length, 1)
   end
 
   def test_exclusivelock_bad
@@ -80,14 +78,14 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["3", "A", :X] ] }
     tick
 
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "A"
         assert_equal(l.xid, "1")
         assert_equal(l.mode, :S)        
       end
     end
-    #puts @lm.acquired_locks.inspected
-    assert_equal(@lm.acquired_locks.length, 1)
+    #puts @lm.locks.inspected
+    assert_equal(@lm.locks.length, 1)
   end
 
   def test_sharedlocks_ok
@@ -98,7 +96,7 @@ class TestLockMgr < Test::Unit::TestCase
     tick
 
     acquiredLocks = Array.new
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "C"
         assert_equal(l.mode, :S)        
         assert(["4", "5"].include?(l.xid))        
@@ -122,7 +120,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["6", "D", :S] ] }
     tick
 
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "D"
         assert_equal(l.xid, "6")
         assert_equal(l.mode, :X)        
@@ -137,14 +135,14 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :X] ] }
     tick(3)
 
-    puts @lm.acquired_locks.inspected
-    @lm.acquired_locks.each do |l|
+    puts @lm.locks.inspected
+    @lm.locks.each do |l|
       if l.resource == "E"
         assert_equal(l.xid, "7")
         assert_equal(l.mode, :X)        
       end
     end
-    assert_equal(@lm.acquired_locks.length, 1)
+    assert_equal(@lm.locks.length, 1)
 
     # Lock upgrade cannot happen if multiple Xacts have a :S lock
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :S ] ]}
@@ -155,7 +153,7 @@ class TestLockMgr < Test::Unit::TestCase
     tick
 
     acquiredLocks = Array.new
-    @lm.acquired_locks.each do |l|
+    @lm.locks.each do |l|
       if l.resource == "F"
         assert_equal(l.mode, :S)        
         assert(["8", "9"].include?(l.xid))        
@@ -176,7 +174,7 @@ class TestLockMgr < Test::Unit::TestCase
     # @lm.sync_do { lm.request_lock <+ [ ["11", "G", "S"] ] }
     # 2.times {@lm.sync_do}
 
-    # @lm.acquired_locks.each do |l|
+    # @lm.locks.each do |l|
     #   if l.resource == "G"
     #     assert_equal(l.mode, "S")        
     #     assert_equal(l.xid, "11")        
@@ -195,7 +193,7 @@ class TestLockMgr < Test::Unit::TestCase
     # 2.times {@lm.sync_do}
 
     # acquiredLocks = Array.new
-    # @lm.acquired_locks.each do |l|
+    # @lm.locks.each do |l|
     #   if l.resource == "H"
     #     assert_equal(l.mode, "S")        
     #     assert(["13", "15"].include?(l.xid))        
@@ -216,7 +214,7 @@ class TestLockMgr < Test::Unit::TestCase
     # @lm.sync_do { lm.end_xact <+ [ ["16"] ] }
     # @lm.sync_do { lm.request_lock <+ [ ["17", "I", "X"] ] }
 
-    # @lm.acquired_locks.each do |l|
+    # @lm.locks.each do |l|
     #   if l.resource == "I"
     #     assert_equal(l.xid, "17")
     #     assert_equal(l.mode, "X")        

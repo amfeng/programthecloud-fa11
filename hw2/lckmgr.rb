@@ -22,7 +22,7 @@ module TwoPhaseLockMgr
     scratch :can_write, request_lock.schema
     scratch :can_upgrade, request_lock.schema
 
-    table :locks, request_lock.schema
+    table :locks, [:xid, :resource] => [:mode]
 
     # TODO: Better to keep redundant data or regenerate on the fly?
     scratch :write_locks, [:resource]
@@ -87,7 +87,7 @@ module TwoPhaseLockMgr
   bloom :process_write do
     # Can grant write lock if currently no other locks on the resource held
     # by any other transaction
-    can_write <= request_write.notin(locks, :resource => :resource) 
+    can_write <= request_write.notin(locks, :resource => :resource)  
     #{ |r, l| true if r.xid != l.xid }
     can_upgrade <= (request_write * locks).lefts(:resource => :resource, :xid => :xid)
     #stdio <~ can_upgrade.inspected 
