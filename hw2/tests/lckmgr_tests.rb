@@ -22,7 +22,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.run_bg
   end
 
-  def tick(n = 2)
+  def tick(n = 5)
     n.times { @lm.sync_do }
   end
 
@@ -76,7 +76,7 @@ class TestLockMgr < Test::Unit::TestCase
     tick
 
     assert_equal(@lm.locks.length, 1)
-    assert(@lm.write_queue.length + @lm.read_queue.length == 1)
+    assert(@lm.queue.length == 1)
   end
 
   def test_locks_ok
@@ -168,9 +168,9 @@ class TestLockMgr < Test::Unit::TestCase
     # Acquire many :S locks, end one Xact 
     # Try to acquire a :X lock - fails
     # Try to acquire a :S lock - succeeds
-    @lm.sync_do { @lm.request_lock <+ [ ["12", "H", :S], ["13", "H", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["12", "J", :S], ["13", "H", :S] ] }
     @lm.sync_do { @lm.end_xact <+ [ ["12"] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["14", "H", :X],["15", "H", :S] ] }
+    @lm.sync_do { @lm.request_lock <+ [ ["14", "J", :X],["15", "H", :S] ] }
     tick
 
     acquiredLocks = Array.new
@@ -178,14 +178,18 @@ class TestLockMgr < Test::Unit::TestCase
       if l.resource == "H"
         assert_equal(l.mode, :S)        
         assert(["13", "15"].include?(l.xid))        
-        acquiredLocks << l.xid
+      elsif l.resource == "J"
+        assert_equal(l.mode, :X)        
+        assert(["14"].include?(l.xid))        
       end
+      acquiredLocks << l.xid
     end
 
     acquiredLocks.sort!
+    assert_equal(acquiredLocks.length, 3)
     assert_equal(acquiredLocks.at(0), "13")
-    assert_equal(acquiredLocks.at(1), "15")
-    assert_equal(acquiredLocks.length, 2)
+    assert_equal(acquiredLocks.at(1), "14")
+    assert_equal(acquiredLocks.at(2), "15")
   end
 
   def test_releaselock_upgrade
@@ -206,14 +210,12 @@ class TestLockMgr < Test::Unit::TestCase
   def test_suddenend
     # End a Xact when it still has pending locks 
     @lm.sync_do { @lm.request_lock <+ [ ["18", "I", :S], ["19", "I", :S], ["19", "J", :X] ] }
-    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :X], ["19", "J", :S] ] }
+    tick
+    @lm.sync_do { @lm.request_lock <+ [ ["19", "I", :X], ["20", "J", :S] ] }
     tick
 
-    #puts @lm.locks.inspected
-    #puts "--"
     assert_equal(@lm.locks.length, 3)
-    assert_equal(@lm.write_queue.length, 1)
-    assert_equal(@lm.read_queue.length, 1)
+    assert_equal(@lm.queue.length, 2)
 
     @lm.sync_do { @lm.end_xact <+ [ ["19"] ] }
     tick
@@ -224,9 +226,8 @@ class TestLockMgr < Test::Unit::TestCase
         assert_equal(l.mode, :S)        
       end
     end
-    assert_equal(@lm.locks.length, 1)
-    assert_equal(@lm.write_queue.length, 0)
-    assert_equal(@lm.read_queue.length, 0)
+    assert_equal(@lm.locks.length, 2)
+    assert_equal(@lm.queue.length, 0)
   end
 end
 
