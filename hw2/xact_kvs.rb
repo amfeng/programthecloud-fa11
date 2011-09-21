@@ -36,7 +36,7 @@ module TwoPLTransactionalKVS
     # Once we have obtained the lock, send that put request to basickvs
 
     can_put <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) 
-    to_put <= can_put.group([:xid, :key], choose(:reqid))
+    to_put <= can_put.argmin([:xid, :key], :reqid)
     kvput <= (to_put * can_put).rights(:xid => :xid, :key => :key)
 
     # Update xput_response to indicate that we are done
@@ -58,7 +58,7 @@ module TwoPLTransactionalKVS
     kvget <= (get_queue * lock_status).lefts(:xid => :xid, :key => :resource) {|get| [get.reqid, get.key]}
     
     # Update xget_response to indicate that we are done
-    xget_response <= (kvget_response * get_queue).pairs(:key => :key) {|resp, get| [get.xid, resp.key, resp.reqid, resp.value]}
+    xget_response <= (kvget_response * get_queue).pairs(:reqid => :reqid) {|resp, get| [get.xid, resp.key, resp.reqid, resp.value]}
 
     # Remove the get request from get_queue
     get_queue <- (get_queue * xget_response).lefts(:xid => :xid, :key => :key, :reqid => :reqid)
