@@ -28,28 +28,11 @@ module TwoPhaseLockMgr
 
     scratch :ended_xacts, [:xid]
     scratch :group_intermediate, [:resource] => [:xid]
+    scratch :group_intermediate2, [:xid, :resource, :mode]
 
     table :queue, [:xid, :resource, :mode]
     scratch :continuing_queue, [:xid, :resource, :mode]
-    scratch :request_pipeline, [:xid, :resource, :mode]
-  end
-
-  bloom :debug do
-    #stdio <~ [["tick #{budtime}"]]
-    #stdio <~ read_queue.inspected
-    #stdio <~ request_read.inspected
-    #stdio <~ write_queue.inspected
-    #stdio <~ allow_writereq.inspected
-
-    #stdio <~ write_locks.inspected
-    #stdio <~ request_read.inspected
-    #stdio <~ locks.inspected
-    #stdio <~ can_read.inspected
-
-    #stdio <~ can_upgrade.inspected 
-    #stdio <~ can_write.inspected
-    #stdio <~ request_write.inspected
-    #stdio <~ locks.inspected
+    scratch :request_pipeline, [:xid, :resource] => [:mode]
   end
 
   # Some locks have restrictions on the number of locks on a resource,
@@ -58,7 +41,6 @@ module TwoPhaseLockMgr
     # Add shared lock requests coming in to the read queue
     #read_queue <= request_lock.select { |r| r.mode == :S } 
     queue <= request_lock
-    #stdio <~ queue.inspected
 
     # No restrictions on how many shared locks allowed on a resource
     # at once (unless there's an exclusive lock), we'll let them all
@@ -80,8 +62,8 @@ module TwoPhaseLockMgr
 
     continuing_queue <= queue.notin(ended_xacts, :xid => :xid)
     group_intermediate <= continuing_queue.group([:resource], choose(:xid))
-    request_pipeline <= (group_intermediate * continuing_queue).rights(:resource => :resource, :xid => :xid)
-    #stdio <~ request_pipeline.inspected
+    group_intermediate2 <= (group_intermediate * continuing_queue).rights(:resource => :resource, :xid => :xid)
+    request_pipeline <= group_intermediate2.group([:xid, :resource], choose(:mode))
     queue <- request_pipeline
 
   end
@@ -104,10 +86,11 @@ module TwoPhaseLockMgr
     # If already have X lock, remove redundant S lock request from read_queue
     # and send OK lock_status
     can_downgrade <= (request_read * locks).lefts(:resource => :resource, :xid => :xid)
+    queue <- can_downgrade
     lock_status <= can_downgrade { |r| [r.xid, r.resource, :OK] }
 
     # Reroute the read lock requests we couldn't grant back into the queue
-    queue <+ request_read.notin(can_read)
+    queue <+ request_read.notin(can_read, :resource => :resource)
    end
 
   # For each write request that comes in, check if we can grant the lock:
@@ -126,7 +109,7 @@ module TwoPhaseLockMgr
     lock_status <= can_write { |w| [w.xid, w.resource, :OK] }
 
     # Reroute the write lock requests we couldn't grant back into the queue
-    queue <+ request_write.notin(can_write)
+    queue <+ request_write.notin(can_write, :resource => :resource)
   end
 
   # At the end of a transaction, remove all of the locks that

@@ -154,10 +154,11 @@ class TestKVS < Test::Unit::TestCase
         assert_equal(kv.value, "baz")
       end
     end
-    
+
     # T2 tries to do a get and put for "foo"
     @kvs.sync_do { @kvs.xget <+ [["T2", "foo", "4"]] }
     @kvs.sync_do { @kvs.xput <+ [["T2", "foo", "5", "foo_b"]] }
+
     
     # T2 should be blocked, since T1 has a :X lock on "foo"
     assert_equal(@kvs.locks.length, 1)
@@ -171,7 +172,7 @@ class TestKVS < Test::Unit::TestCase
     # T1 does a get and put on "foo2"
     @kvs.sync_callback(:xget, [["T1", "foo2", 6]], :xget_response)
     @kvs.sync_callback(:xput, [["T1", "foo2", 7, "foo2_a"]], :xput_response)
-    tick
+    tick(1)
 
     # T1 should have a :X lock on "foo" and "foo2"
     assert_equal(@kvs.locks.length, 2)
@@ -185,7 +186,7 @@ class TestKVS < Test::Unit::TestCase
         assert_equal(l.mode, :X)        
       end
     end
-    
+
     # kvstate should have the T1's updated values for "foo" and "foo2"
     assert_equal(@kvs.kvstate.length, 2)
     @kvs.kvstate.each do |kv|
@@ -200,13 +201,12 @@ class TestKVS < Test::Unit::TestCase
     # End T1
     @kvs.sync_do { @kvs.end_xact <+ [["T1"]] }
     tick
-    tick
 
     # Since T2 had been trying to do a get and put on "foo" - it should obtain a :X lock for "foo" now
     assert_equal(@kvs.locks.length, 1)
     @kvs.locks.each do |l|
       if l.resource == "foo"
-        assert_equal(l.xid, "T1")
+        assert_equal(l.xid, "T2")
         assert_equal(l.mode, :X)        
       end
     end
