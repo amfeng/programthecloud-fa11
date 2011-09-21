@@ -34,7 +34,6 @@ module TwoPLTransactionalKVS
     put_queue <= xput
     
     # Once we have obtained the lock, send that put request to basickvs
-
     can_put <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) 
     to_put <= can_put.argmin([:xid, :key], :reqid)
     kvput <= (to_put * can_put).rights(:xid => :xid, :key => :key)
