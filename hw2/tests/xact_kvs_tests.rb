@@ -123,33 +123,140 @@ class TestKVS < Test::Unit::TestCase
   # Testing a conflict serializable schedule
   def test_conflict_serialiability
 
-    @kvs.register_callback(:xput_response) do |cb|
-      cb.each do |row|
-        assert(["A", "T1"].include? row.xid)
-        assert_equal("foo", row.key)
-      end 
-    end
-
-    @kvs.register_callback(:xget_response) do |cb|
-      cb.each do |row|
-        assert_equal("T1", row.xid)
-        assert_equal("bar", row.data)
-      end 
-    end
-        
+    # Populate kvstate with two key-values
     @kvs.sync_callback(:xput, [["A", "foo", 1, "bar"]], :xput_response)
+    @kvs.sync_callback(:xput, [["A", "foo2", 1, "baz"]], :xput_response)
     @kvs.sync_do { @kvs.end_xact <+ [["A"]] }
-    
-    @kvs.sync_callback(:xget, [["T1", "foo", 2]], :xget_response)
-    @kvs.sync_callback(:xput, [["T1", "foo", 3, "baz"]], :xput_response)
     tick
 
+    assert_equal(@kvs.locks.length, 0)
+    # T1 does a get and a put on "foo"
+    @kvs.sync_callback(:xget, [["T1", "foo", 2]], :xget_response)
+    @kvs.sync_callback(:xput, [["T1", "foo", 3, "foo_a"]], :xput_response)
+    tick
+    
+    # T1 should have obtained a :X lock on "foo"
+    assert_equal(@kvs.locks.length, 1)
     @kvs.locks.each do |l|
       if l.resource == "foo"
         assert_equal(l.xid, "T1")
         assert_equal(l.mode, :X)        
       end
     end
+    
+    # kvstate should have the updated value for "foo" but the old value for "foo2"
+    assert_equal(@kvs.kvstate.length, 2)
+    @kvs.kvstate.each do |kv|
+      if (kv.key == "foo")
+        assert_equal(kv.value, "foo_a")        
+      end
+      if (kv.key == "foo2")
+        assert_equal(kv.value, "baz")
+      end
+    end
+    
+    # T2 tries to do a get and put for "foo"
+    @kvs.sync_callback(:xget, [["T2", "foo", 4]], :xget_response)
+    @kvs.sync_callback(:xput, [["T2", "foo", 5, "foo_b"]], :xput_response)
+    tick
+
+    # T2 should be blocked, since T1 has a :X lock on "foo"
+    assert_equal(@kvs.locks.length, 1)
+    @kvs.locks.each do |l|
+      if l.resource == "foo"
+        assert_equal(l.xid, "T1")
+        assert_equal(l.mode, :X)        
+      end
+    end
+
+    # T1 does a get and put on "foo2"
+    @kvs.sync_callback(:xget, [["T1", "foo2", 6]], :xget_response)
+    @kvs.sync_callback(:xput, [["T1", "foo2", 7, "foo2_b"]], :xput_response)
+    tick
+
+    # T1 should have a :X lock on "foo" and "foo2"
+    assert_equal(@kvs.locks.length, 2)
+    @kvs.locks.each do |l|
+      if l.resource == "foo"
+        assert_equal(l.xid, "T1")
+        assert_equal(l.mode, :X)        
+      end
+      if l.resource == "foo2"
+        assert_equal(l.xid, "T1")
+        assert_equal(l.mode, :X)        
+      end
+    end
+    
+    # kvstate should have the T1's updated values for "foo" and "foo2"
+    assert_equal(@kvs.kvstate.length, 2)
+    @kvs.kvstate.each do |kv|
+      if (kv.key == "foo")
+        assert_equal(kv.value, "foo_a")        
+      end
+      if (kv.key == "foo2")
+        assert_equal(kv.value, "foo2_a")
+      end
+    end
+
+    # End T1
+    @kvs.sync_do { @kvs.end_xact <+ [["T1"]] }
+    tick
+
+    # Since T2 had been trying to do a get and put on "foo" - it should obtain a :X lock for "foo" now
+    assert_equal(@kvs.locks.length, 1)
+    @kvs.locks.each do |l|
+      if l.resource == "foo"
+        assert_equal(l.xid, "T1")
+        assert_equal(l.mode, :X)        
+      end
+    end
+    
+    # kvstate should have T2's value for "foo" and T1's for "foo2"
+    assert_equal(@kvs.kvstate.length, 2)
+    @kvs.kvstate.each do |kv|
+      if (kv.key == "foo")
+        assert_equal(kv.value, "foo_b")        
+      end
+      if (kv.key == "foo2")
+        assert_equal(kv.value, "foo2_a")
+      end
+    end
+    
+    # T2 does a get and put on "foo2"
+    @kvs.sync_callback(:xget, [["T2", "foo2_b", 4]], :xget_response)
+    @kvs.sync_callback(:xput, [["T2", "foo2_b", 5, "foo2_b"]], :xput_response)
+    tick
+
+    # T2 should have a :X lock on "foo" and "foo2"
+    assert_equal(@kvs.locks.length, 2)
+    @kvs.locks.each do |l|
+      if l.resource == "foo"
+        assert_equal(l.xid, "T2")
+        assert_equal(l.mode, :X)        
+      end
+      if l.resource == "foo2"
+        assert_equal(l.xid, "T2")
+        assert_equal(l.mode, :X)        
+      end
+    end
+    
+    # kvstate should have T2's updated values for "foo" and "foo2"
+    assert_equal(@kvs.kvstate.length, 2)
+    @kvs.kvstate.each do |kv|
+      if (kv.key == "foo")
+        assert_equal(kv.value, "foo_b")        
+      end
+      if (kv.key == "foo2")
+        assert_equal(kv.value, "foo2_b")
+      end
+    end
+
+    # End T2
+    @kvs.sync_do { @kvs.end_xact <+ [["T2"]] }
+    tick
+    
+    # All locks should have been released
+    assert_equal(@kvs.length, 0)
   end
 
   # From bud-sandbox KVS tests
