@@ -11,7 +11,7 @@ class KVS
     table :lock_statuses, [:xid, :resource] => [:status]
 
     table :xput_responses, [:xid, :key, :reqid]
-    table :kvputs, [:client, :key] => [:reqid, :value]
+    table :kvputs, [:client, :key, :reqid, :value]
 
     table :xget_responses, [:xid, :key, :reqid] => [:data]
     table :kvgets, [:reqid] => [:key]
@@ -32,14 +32,21 @@ end
 
 class TestKVS < Test::Unit::TestCase
   @kvs = nil
+
   def setup
     @kvs = KVS.new()
     @kvs.run_bg
   end
 
+  def teardown
+    @kvs.stop_bg
+  end
+
   def tick(n = 4)
     n.times { @kvs.sync_do }
   end
+
+
 
   def test_basic_put
     @kvs.sync_do { @kvs.xput <+ [["A", "foo", "1", "bar"]] }
@@ -108,11 +115,33 @@ class TestKVS < Test::Unit::TestCase
 
     assert_equal(@kvs.get_queue.length, 0)
     
-
     @kvs.kvgets.each do |get|
       assert_equal(get.key, "foo")
     end
   end
+
+  # From bud-sandbox KVS tests
+  def test_simple_kvs
+    workload1
+    @kvs.sync_do { assert_equal(1, @kvs.kvstate.length) }
+    @kvs.sync_do { assert_equal("bak", @kvs.kvstate.first[1]) }
+
+    @kvs.sync_do { @kvs.end_xact <+ [["localhost:54321"]] }
+    @kvs.sync_do { @kvs.xget <+ [[1234, 'foo', 5]] }
+    @kvs.sync_do {
+      assert_equal(1, @kvs.xget_response.length)
+      assert_equal("bak", @kvs.xget_response.first[3])
+    }
+
+  end
+
+  def workload1()
+    @kvs.sync_do { @kvs.xput <+ [["localhost:54321", "foo", 1, "bar"]] }
+    @kvs.sync_do { @kvs.xput <+ [["localhost:54321", "foo", 2, "baz"]] }
+    @kvs.sync_do { @kvs.xput <+ [["localhost:54321", "foo", 3, "bam"]] }
+    @kvs.sync_do { @kvs.xput <+ [["localhost:54321", "foo", 4, "bak"]] }
+  end
+
 end
 
 

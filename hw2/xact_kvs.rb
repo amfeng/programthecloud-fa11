@@ -20,6 +20,9 @@ module TwoPLTransactionalKVS
   state do
     table :put_queue, [:xid, :key, :reqid] => [:data]
     table :get_queue, [:xid, :key, :reqid]
+
+    scratch :can_put, [:xid, :key, :reqid] => [:data]
+    scratch :to_put, [:xid, :key, :reqid] => [:data]
   end
 
   # Perform the puts
@@ -31,7 +34,11 @@ module TwoPLTransactionalKVS
     put_queue <= xput
     
     # Once we have obtained the lock, send that put request to basickvs
-    kvput <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) 
+
+    can_put <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) 
+    to_put <= can_put.group([:xid, :key], choose(:reqid))
+    kvput <= (to_put * can_put).rights(:xid => :xid, :key => :key)
+    stdio <~ kvput.inspected
 
     # Update xput_response to indicate that we are done
     xput_response <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) {|put| [put.xid, put.key, put.reqid]}
@@ -59,7 +66,7 @@ module TwoPLTransactionalKVS
   end
 
   bloom :debug do
-    #stdio <~ [["tick #{budtime}"]]
+    stdio <~ [["tick #{budtime}"]]
     #stdio <~ xput.inspected
     #stdio <~ xget.inspected
     #stdio <~ kvget_response.inspected
