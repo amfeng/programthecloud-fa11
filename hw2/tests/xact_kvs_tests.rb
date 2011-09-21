@@ -150,18 +150,6 @@ class TestKVS < Test::Unit::TestCase
         assert_equal(l.mode, :X)        
       end
     end
-
-    
-    # @kvs.sync_callback(:xget, [["A", "foo", 1]], :xget_response)
-
-    # @kvs.sync_callback(:xput, [["A", "foo", 8, "big"]], :xput_response)
-    # res = @kvs.sync_callback(:xget, [["A", "foo", 9]], :xget_response)
-
-    # @kvs.sync_do { @kvs.xget <+ [["B", "foo", 10]] }
-    # @kvs.sync_do { @kvs.xget <+ [["C", "foo", 11]] }
-    # @kvs.sync_do { @kvs.xget <+ [["D", "foo", 12]] }
-    # @kvs.sync_do { @kvs.end_xact <+ [["A"]] }
-    # tick
   end
 
   # From bud-sandbox KVS tests
