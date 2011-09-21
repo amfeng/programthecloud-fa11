@@ -22,7 +22,7 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.run_bg
   end
 
-  def tick(n = 5)
+  def tick(n = 1)
     n.times { @lm.sync_do }
   end
 
@@ -73,7 +73,7 @@ class TestLockMgr < Test::Unit::TestCase
   def test_locks_bad
     # Can't have both a shared and exclusive lock on a resource
     @lm.sync_do { @lm.request_lock <+ [ ["1", "A", :S], ["3", "A", :X] ] }
-    tick
+    tick(2)
 
     assert_equal(@lm.locks.length, 1)
     assert(@lm.queue.length == 1)
@@ -82,7 +82,7 @@ class TestLockMgr < Test::Unit::TestCase
   def test_locks_ok
     # Multiple Xacts can acquire a shared lock on a resource
     @lm.sync_do { @lm.request_lock <+ [ ["4", "C", :S],["5", "C", :S] ] }
-    tick
+    tick(2)
 
     acquiredLocks = Array.new
     @lm.locks.each do |l|
@@ -218,7 +218,7 @@ class TestLockMgr < Test::Unit::TestCase
     assert_equal(@lm.queue.length, 2)
 
     @lm.sync_do { @lm.end_xact <+ [ ["19"] ] }
-    tick
+    tick(2)
 
     @lm.locks.each do |l|
       if l.resource == "I"
