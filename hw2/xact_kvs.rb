@@ -59,11 +59,12 @@ module TwoPLTransactionalKVS
   end
 
   bloom :debug do
-    stdio <~ [["tick #{budtime}"]]
-    stdio <~ xput.inspected
-    stdio <~ xget.inspected
-    stdio <~ request_lock.inspected
-    stdio <~ locks.inspected
-    stdio <~ lock_status
+    #stdio <~ [["tick #{budtime}"]]
+    #stdio <~ xput.inspected
+    #stdio <~ xget.inspected
+    #stdio <~ kvget_response.inspected
+    #stdio <~ request_lock.inspected
+    #stdio <~ locks.inspected
+    #stdio <~ lock_status
   end
 end

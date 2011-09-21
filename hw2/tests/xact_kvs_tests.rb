@@ -15,6 +15,7 @@ class KVS
 
     table :xget_responses, [:xid, :key, :reqid] => [:data]
     table :kvgets, [:reqid] => [:key]
+    table :kvget_responses, [:reqid] => [:key, :value]
   end
 
   bloom do
@@ -23,6 +24,7 @@ class KVS
     kvputs <= kvput
 
     xget_responses <= xget_response
+    kvget_responses <= kvget_response
     kvgets <= kvget
   end
 
@@ -39,64 +41,73 @@ class TestKVS < Test::Unit::TestCase
     n.times { @kvs.sync_do }
   end
 
-  def test_put
-
-    @kvs.sync_do { @kvs.xput <+ [["1", "foo", "1", "bar"]] }
+  def test_basic_put
+    @kvs.sync_do { @kvs.xput <+ [["A", "foo", "1", "bar"]] }
     tick
+
+    assert_equal(@kvs.locks.length, 1)
     @kvs.locks.each do |l|
       if l.resource == "foo"
-        assert_equal(l.xid, "1")
+        assert_equal(l.xid, "A")
         assert_equal(l.mode, :X)        
       end
     end
 
-    @kvs.lock_statuses.each do |l|
-      assert_equal(l.xid, "1")
-      assert_equal(l.resource, "foo")
-    end
+    assert_equal(@kvs.lock_statuses.length, 1)
 
+    assert_equal(@kvs.kvputs.length, 1)
     @kvs.kvputs.each do |put|
-      assert_equal(put.key, "foo")
+      assert_equal(put.reqid, "1")
     end
 
+    assert_equal(@kvs.xput_responses.length, 1)
     @kvs.xput_responses.each do |responses|
-      assert_equal(responses.xid, "1")
+      assert_equal(responses.xid, "A")
+      assert_equal(responses.key, "foo")
+      assert_equal(responses.reqid, "1")
     end
     
     assert_equal(@kvs.kvstate.length, 1)
+    @kvs.kvstate.each do |kv|
+      assert_equal(kv.key, "foo")
+      assert_equal(kv.value, "bar")
+    end
   end
 
-  def test_get
-    @kvs.sync_do { @kvs.xput <+ [["1", "foo", "1", "bar"]] }
-    tick
-    @kvs.sync_do { @kvs.xget <+ [["1", "foo", "1"]] }
+  def test_basic_get
+    @kvs.sync_do { @kvs.xput <+ [["A", "foo", "1", "bar"]] }
+    @kvs.sync_do { @kvs.xget <+ [["A", "foo", "1"]] }
     tick
 
+    assert_equal(@kvs.locks.length, 1)
     @kvs.locks.each do |l|
       if l.resource == "foo"
-        assert_equal(l.xid, "1")
+        assert_equal(l.xid, "A")
         assert_equal(l.mode, :X)        
       end
     end    
 
-    @kvs.kvputs.each do |put|
-      assert_equal(put.key, "foo")
-    end
-    
-    @kvs.get_queue.each do |get|
-      assert_equal(get.key, "foo")
-    end
-    
+    assert_equal(@kvs.kvstate.length, 1)
     @kvs.kvstate.each do |kv|
       assert_equal(kv.key, "foo")
       assert_equal(kv.value, "bar")
     end
 
-    # assert_equal(@kvs.kvget_response.length, 1)
+    assert_equal(@kvs.kvgets.length, 1)
+    @kvs.kvgets.each do |put|
+      assert_equal(put.reqid, "1")
+    end
 
     assert_equal(@kvs.xget_responses.length, 1)
+    @kvs.xget_responses.each do |responses|
+      assert_equal(responses.xid, "A")
+      assert_equal(responses.key, "foo")
+      assert_equal(responses.reqid, "1")
+      assert_equal(responses.data, "bar")
+    end
+
+    assert_equal(@kvs.get_queue.length, 0)
     
-    assert_equal(@kvs.kvgets.length, 1)
 
     @kvs.kvgets.each do |get|
       assert_equal(get.key, "foo")
