@@ -120,6 +120,33 @@ class TestKVS < Test::Unit::TestCase
     end
   end
 
+  # Testing a conflict serializable schedule
+  def test_conflict_serialiability
+    
+    @kvs.register_callback(:xput_responses) do |cb|
+      cb.each do |row|
+        assert_equal("A", row.xid)
+        assert_equal("foo", row.key)
+        assert_equal(1, row.reqid)
+      end 
+    end
+
+    # @kvs.sync_callback(:xput, [["A", "foo", 1, "bar"]], :xput_response)
+    @kvs.sync_do {@kvs.xput <+ [["A", "foo", 1, "bar"]] }
+    tick
+    
+    # @kvs.sync_callback(:xget, [["A", "foo", 1]], :xget_response)
+
+    # @kvs.sync_callback(:xput, [["A", "foo", 8, "big"]], :xput_response)
+    # res = @kvs.sync_callback(:xget, [["A", "foo", 9]], :xget_response)
+
+    # @kvs.sync_do { @kvs.xget <+ [["B", "foo", 10]] }
+    # @kvs.sync_do { @kvs.xget <+ [["C", "foo", 11]] }
+    # @kvs.sync_do { @kvs.xget <+ [["D", "foo", 12]] }
+    # @kvs.sync_do { @kvs.end_xact <+ [["A"]] }
+    # tick
+  end
+
   # From bud-sandbox KVS tests
   def test_simple_kvs
     workload1

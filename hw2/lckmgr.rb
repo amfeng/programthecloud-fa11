@@ -71,12 +71,12 @@ module TwoPhaseLockMgr
    
     # At most 1 exclusive lock per resource at a time, so we'll choose one per 
     # resource to process
-    #continuing_write_queue <= write_queue.notin(ended_xacts, :xid => :xid)
-    #temp :allow_writereq <= continuing_write_queue.group([:resource, :mode], choose(:xid))
+    # continuing_write_queue <= write_queue.notin(ended_xacts, :xid => :xid)
+    # temp :allow_writereq <= continuing_write_queue.group([:resource, :mode], choose(:xid))
 
     # Reorder columns because they got messed up in the grouping
-    #request_write <= allow_writereq {|r| [r[2], r[0], r[1]] }
-    #write_queue <- allow_writereq {|r| [r[2], r[0], r[1]] }
+    # request_write <= allow_writereq {|r| [r[2], r[0], r[1]] }
+    # write_queue <- allow_writereq {|r| [r[2], r[0], r[1]] }
 
     continuing_queue <= queue.notin(ended_xacts, :xid => :xid)
     group_intermediate <= continuing_queue.group([:resource], choose(:xid))
