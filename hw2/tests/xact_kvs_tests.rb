@@ -122,18 +122,34 @@ class TestKVS < Test::Unit::TestCase
 
   # Testing a conflict serializable schedule
   def test_conflict_serialiability
-    
-    @kvs.register_callback(:xput_responses) do |cb|
+
+    @kvs.register_callback(:xput_response) do |cb|
       cb.each do |row|
-        assert_equal("A", row.xid)
+        assert(["A", "T1"].include? row.xid)
         assert_equal("foo", row.key)
-        assert_equal(1, row.reqid)
       end 
     end
 
-    # @kvs.sync_callback(:xput, [["A", "foo", 1, "bar"]], :xput_response)
-    @kvs.sync_do {@kvs.xput <+ [["A", "foo", 1, "bar"]] }
-    tick
+    @kvs.register_callback(:xget_response) do |cb|
+      cb.each do |row|
+        assert_equal("T1", row.xid)
+        assert_equal("bar", row.data)
+      end 
+    end
+        
+    @kvs.sync_callback(:xput, [["A", "foo", 1, "bar"]], :xput_response)
+    @kvs.sync_do { @kvs.end_xact <+ [["A"]] }
+    
+    @kvs.sync_callback(:xget, [["T1", "foo", 2]], :xget_response)
+    @kvs.sync_callback(:xput, [["T1", "foo", 3, "baz"]], :xput_response)
+
+    @kvs.locks.each do |l|
+      if l.resource == "foo"
+        assert_equal(l.xid, "T1")
+        assert_equal(l.mode, :X)        
+      end
+    end
+
     
     # @kvs.sync_callback(:xget, [["A", "foo", 1]], :xget_response)
 
