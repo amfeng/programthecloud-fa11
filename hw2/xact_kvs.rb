@@ -38,7 +38,6 @@ module TwoPLTransactionalKVS
     can_put <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) 
     to_put <= can_put.group([:xid, :key], choose(:reqid))
     kvput <= (to_put * can_put).rights(:xid => :xid, :key => :key)
-    stdio <~ kvput.inspected
 
     # Update xput_response to indicate that we are done
     xput_response <= (put_queue * lock_status).lefts(:xid => :xid, :key => :resource) {|put| [put.xid, put.key, put.reqid]}
@@ -66,7 +65,7 @@ module TwoPLTransactionalKVS
   end
 
   bloom :debug do
-    stdio <~ [["tick #{budtime}"]]
+    #stdio <~ [["tick #{budtime}"]]
     #stdio <~ xput.inspected
     #stdio <~ xget.inspected
     #stdio <~ kvget_response.inspected

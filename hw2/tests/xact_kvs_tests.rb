@@ -142,6 +142,33 @@ class TestKVS < Test::Unit::TestCase
     @kvs.sync_do { @kvs.xput <+ [["localhost:54321", "foo", 4, "bak"]] }
   end
 
+  # From bud-sandbox KVS tests
+  def test_xact_kvs
+    @kvs.sync_callback(:xput, [[1, "foo", "bar"]], :xput_response)
+    @kvs.sync_callback(:xput, [[1, "bam", "biz"]], :xput_response)
+    @kvs.sync_callback(:xput, [[1, "foo", "big"]], :xput_response)
+    res = @kvs.sync_callback(:xget, [[1, "foo"]], :xget_response)
+
+    @kvs.register_callback(:xget_response) do |cb|
+      cb.each do |row|
+        assert_equal(1, row.xid)
+        assert_equal("big", row.value)
+      end 
+
+    end
+
+    @kvs.sync_do { @kvs.xget <+ [[2, "foo"]] }
+
+    @kvs.sync_do { @kvs.end_xact <+ [[1]] }
+
+    @kvs.register_callback(:xget_response) do |cb|
+      cb.each do |row|
+        assert_equal(2, row.xid)
+        assert_equal("big", row.value)
+      end 
+    end
+  end
+
 end
 
 
