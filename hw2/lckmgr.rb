@@ -99,12 +99,12 @@ module TwoPhaseLockMgr
     can_read <= request_read.notin(write_locks, :resource => :resource) 
 
     locks <+ can_read
-    lock_status <+ can_read { |r| [r.xid, r.resource, :OK] }
+    lock_status <= can_read { |r| [r.xid, r.resource, :OK] }
 
     # If already have X lock, remove redundant S lock request from read_queue
     # and send OK lock_status
     can_downgrade <= (request_read * locks).lefts(:resource => :resource, :xid => :xid)
-    lock_status <+ can_downgrade { |r| [r.xid, r.resource, :OK] }
+    lock_status <= can_downgrade { |r| [r.xid, r.resource, :OK] }
 
     # Reroute the read lock requests we couldn't grant back into the queue
     queue <+ request_read.notin(can_read)
@@ -123,7 +123,7 @@ module TwoPhaseLockMgr
     can_write <= request_write.notin(unique_locks, :resource => :resource) 
 
     locks <+- can_write
-    lock_status <+ can_write { |w| [w.xid, w.resource, :OK] }
+    lock_status <= can_write { |w| [w.xid, w.resource, :OK] }
 
     # Reroute the write lock requests we couldn't grant back into the queue
     queue <+ request_write.notin(can_write)

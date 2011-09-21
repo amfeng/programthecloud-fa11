@@ -142,6 +142,7 @@ class TestKVS < Test::Unit::TestCase
     
     @kvs.sync_callback(:xget, [["T1", "foo", 2]], :xget_response)
     @kvs.sync_callback(:xput, [["T1", "foo", 3, "baz"]], :xput_response)
+    tick
 
     @kvs.locks.each do |l|
       if l.resource == "foo"
