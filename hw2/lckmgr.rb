@@ -21,6 +21,7 @@ module TwoPhaseLockMgr
 
     scratch :can_read, [:xid, :resource] => [:mode]
     scratch :can_write, [:xid, :resource] => [:mode]
+    scratch :can_downgrade, [:xid, :resource] => [:mode]
     scratch :unique_locks, [:xid, :resource] => [:mode]
 
     table :locks, [:xid, :resource] => [:mode]
@@ -100,8 +101,10 @@ module TwoPhaseLockMgr
     locks <+ can_read
     lock_status <= can_read { |r| [r.xid, r.resource, :OK] }
 
-    # TODO: If already have X lock, remove redundant S lock request from read_queue
+    # If already have X lock, remove redundant S lock request from read_queue
     # and send OK lock_status
+    can_downgrade <= (request_read * locks).lefts(:resource => :resource, :xid => :xid)
+    lock_status <= can_downgrade { |r| [r.xid, r.resource, :OK] }
 
     # Reroute the read lock requests we couldn't grant back into the queue
     queue <+ request_read.notin(can_read)
