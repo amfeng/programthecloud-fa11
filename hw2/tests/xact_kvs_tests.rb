@@ -304,6 +304,38 @@ class TestKVS < Test::Unit::TestCase
     @kvs.sync_do { @kvs.end_xact <+ [["A"]] }
     tick
   end
+
+  def test_concurrent_accesses
+    # Populate kvstate with two key-values
+    @kvs.sync_callback(:xput, [["T", "A", 1, 1000]], :xput_response)
+    @kvs.sync_callback(:xput, [["T", "B", 2, 1000]], :xput_response)
+    @kvs.sync_do { @kvs.end_xact <+ [["T"]] }
+    tick
+    assert_equal(@kvs.locks.length, 0)
+    
+    # T1 does a get and a put on "foo"
+    @kvs.sync_do { @kvs.xput <+ [["T1", "A", 3, 1100], ["T2", "A", 4, 1060], ["T1", "B", 5, 900], ["T2", "B", 6, 960]] }
+    @kvs.sync_do
+    assert_equal(@kvs.locks.length, 2)
+    assert_equal(@kvs.kvstate.length, 2)
+    
+    @kvs.kvstate.each do |kv|
+      @kvs.locks.each do |l|
+        if kv.key == "A" and l.xid == "T1"
+          assert_equal(kv.value, 1100)
+        end
+        if kv.key == "A" and l.xid == "T2"
+          assert_equal(kv.value, 1060)
+        end
+        if kv.key == "B" and l.xid == "T1"
+          assert_equal(kv.value, 900)
+        end
+        if kv.key == "B" and l.xid == "T2"
+          assert_equal(kv.value, 960)
+        end
+      end
+    end
+  end
 end
 
 
