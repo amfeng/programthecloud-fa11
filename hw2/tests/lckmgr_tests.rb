@@ -122,16 +122,17 @@ class TestLockMgr < Test::Unit::TestCase
     @lm.sync_do { @lm.request_lock <+ [ ["7", "E", :X] ] }
     tick
 
+    assert_equal(@lm.locks.length, 1)
     @lm.locks.each do |l|
       if l.resource == "E"
         assert_equal(l.xid, "7")
         assert_equal(l.mode, :X)        
       end
     end
-    assert_equal(@lm.locks.length, 1)
 
     # Lock upgrade cannot happen if multiple Xacts have a :S lock
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :S ], ["9", "F", :S] ] }
+    tick
     @lm.sync_do { @lm.request_lock <+ [ ["8", "F", :X] ] }
     tick
 
@@ -143,10 +144,10 @@ class TestLockMgr < Test::Unit::TestCase
         acquiredLocks << l.xid
       end
     end
+    assert_equal(acquiredLocks.length, 2)
     acquiredLocks.sort!
     assert_equal(acquiredLocks.at(0), "8")
     assert_equal(acquiredLocks.at(1), "9")
-    assert_equal(acquiredLocks.length, 2)
   end
 
   def test_releaselock_simple
@@ -228,6 +229,45 @@ class TestLockMgr < Test::Unit::TestCase
     end
     assert_equal(@lm.locks.length, 2)
     assert_equal(@lm.queue.length, 0)
+  end
+
+  def test_blocking
+    res = @lm.sync_callback(:request_lock, [[1, "foo", :S]], :lock_status)
+    res = @lm.sync_callback(:request_lock, [[1, "bar", :S]], :lock_status)
+
+    assert_equal([1, "bar", :OK], res.first)
+
+    q = Queue.new
+    @lm.register_callback(:lock_status) do |l|
+      l.each do |row|
+        if row.xid == 2
+          q.push row
+        end
+      end
+    end
+
+
+    @lm.register_callback(:lock_status) do |l|
+      l.each do |row|
+        if row.xid == 3
+          @lm.sync_do{ @lm.end_xact <+ [[3]]}
+          @lm.sync_do
+        end
+      end
+    end
+
+
+    @lm.sync_do{ @lm.request_lock <+ [[2, "foo", :S]]}
+    @lm.sync_do{ @lm.request_lock <+ [[3, "foo", :S]]}
+
+    assert_equal(@lm.locks.length, 3)
+    @lm.sync_do { @lm.end_xact <+ [[1]]}
+    @lm.sync_do
+    assert_equal(@lm.locks.length, 1)
+
+    row = q.pop
+    assert_equal([2, "foo", :OK], row)
+    assert(true)
   end
 end
 
