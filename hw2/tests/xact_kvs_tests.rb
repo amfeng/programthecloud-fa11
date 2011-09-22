@@ -314,27 +314,28 @@ class TestKVS < Test::Unit::TestCase
     assert_equal(@kvs.locks.length, 0)
     
     # T1 does a get and a put on "foo"
-    @kvs.sync_do { @kvs.xput <+ [["T1", "A", 3, 1100], ["T2", "A", 4, 1060], ["T1", "B", 5, 900], ["T2", "B", 6, 960]] }
+    @kvs.sync_do { @kvs.xput <+ [["T2", "A", 3, 1060], ["T1", "A", 4, 1100], ["T1", "B", 5, 900], ["T2", "B", 6, 960]] }
     @kvs.sync_do
     assert_equal(@kvs.locks.length, 2)
     assert_equal(@kvs.kvstate.length, 2)
     
     @kvs.kvstate.each do |kv|
       @kvs.locks.each do |l|
-        if kv.key == "A" and l.xid == "T1"
+        if kv.key == "A" and l.xid == "T1" and l.resource == "A"
           assert_equal(kv.value, 1100)
         end
-        if kv.key == "A" and l.xid == "T2"
+        if kv.key == "A" and l.xid == "T2" and l.resource == "A"
           assert_equal(kv.value, 1060)
         end
-        if kv.key == "B" and l.xid == "T1"
+        if kv.key == "B" and l.xid == "T1" and l.resource == "B"
           assert_equal(kv.value, 900)
         end
-        if kv.key == "B" and l.xid == "T2"
+        if kv.key == "B" and l.xid == "T2" and l.resource == "B"
           assert_equal(kv.value, 960)
         end
       end
     end
+
   end
 end
 
