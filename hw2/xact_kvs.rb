@@ -21,6 +21,8 @@ module TwoPLTransactionalKVS
     table :put_queue, [:xid, :key, :reqid] => [:data]
     table :get_queue, [:xid, :key, :reqid]
 
+    # Intermediate tables for grouping and joining to allow only
+    # one put at each timestep
     scratch :can_put, [:xid, :key, :reqid] => [:data]
     scratch :to_put, [:xid, :key, :reqid] => [:data]
   end
@@ -61,15 +63,5 @@ module TwoPLTransactionalKVS
 
     # Remove the get request from get_queue
     get_queue <- (get_queue * xget_response).lefts(:xid => :xid, :key => :key, :reqid => :reqid)
-  end
-
-  bloom :debug do
-    #stdio <~ [["tick #{budtime}"]]
-    #stdio <~ xput.inspected
-    #stdio <~ xget.inspected
-    #stdio <~ kvget_response.inspected
-    #stdio <~ request_lock.inspected
-    #stdio <~ locks.inspected
-    #stdio <~ lock_status
   end
 end

@@ -13,59 +13,49 @@ module TwoPhaseLockMgr
   include LockMgrProtocol
 
   state do
+    # Persistent state for the current locks issued, and pending
+    # lock requests
+    table :locks, [:xid, :resource] => [:mode]
+    table :queue, [:xid, :resource, :mode]
+
+    # Temporary variables for current read requests in the request
+    # pipeline
     scratch :request_read, [:xid, :resource] => [:mode]
     scratch :request_write, [:xid, :resource] => [:mode]
-    
-    # TODO: Better to keep redundant data or regenerate on the fly?
-    scratch :write_locks, [:resource]
 
+    # Temporary variables for accepted read/write lock requests and
+    # temporary variables used to process those
     scratch :can_read, [:xid, :resource] => [:mode]
     scratch :can_write, [:xid, :resource] => [:mode]
     scratch :can_downgrade, [:xid, :resource] => [:mode]
     scratch :unique_locks, [:xid, :resource] => [:mode]
+    
+    # TODO: Better to keep redundant data or regenerate on the fly?
+    scratch :write_locks, [:resource]
 
-    table :locks, [:xid, :resource] => [:mode]
-
+    # Temporary variable for ended transactions, so we know to remove
+    # them from all of the deferred queues as well
     scratch :ended_xacts, [:xid]
-    scratch :group_intermediate, [:resource] => [:xid]
-    scratch :group_intermediate2, [:xid, :resource, :mode]
 
-    table :queue, [:xid, :resource, :mode]
+    # Temporary variables for choosing which requests to process at a
+    # timestep, to avoid "concurrent concerns"
     scratch :continuing_queue, [:xid, :resource, :mode]
+    scratch :group_queue, [:resource] => [:xid]
+    scratch :group_queue_single, [:xid, :resource, :mode]
     scratch :request_pipeline, [:xid, :resource] => [:mode]
   end
 
   # Some locks have restrictions on the number of locks on a resource,
   # so doesn't make sense to process more than the allowed amount
   bloom :gatekeeper do
-    # Add shared lock requests coming in to the read queue
-    #read_queue <= request_lock.select { |r| r.mode == :S } 
+    # Add lock requests coming in to the queue
     queue <= request_lock
 
-    # No restrictions on how many shared locks allowed on a resource
-    # at once (unless there's an exclusive lock), we'll let them all
-    # in for processing
-    #request_read <= read_queue.notin(ended_xacts, :xid => :xid)
-    #read_queue <- read_queue
-
-    # Add exclusive lock requests coming in to the read queue
-    #write_queue <= request_lock.select { |r| r.mode == :X } 
-   
-    # At most 1 exclusive lock per resource at a time, so we'll choose one per 
-    # resource to process
-    # continuing_write_queue <= write_queue.notin(ended_xacts, :xid => :xid)
-    # temp :allow_writereq <= continuing_write_queue.group([:resource, :mode], choose(:xid))
-
-    # Reorder columns because they got messed up in the grouping
-    # request_write <= allow_writereq {|r| [r[2], r[0], r[1]] }
-    # write_queue <- allow_writereq {|r| [r[2], r[0], r[1]] }
-
     continuing_queue <= queue.notin(ended_xacts, :xid => :xid)
-    group_intermediate <= continuing_queue.group([:resource], choose(:xid))
-    group_intermediate2 <= (group_intermediate * continuing_queue).rights(:resource => :resource, :xid => :xid)
-    request_pipeline <= group_intermediate2.group([:xid, :resource], choose(:mode))
+    group_queue <= continuing_queue.group([:resource], choose(:xid))
+    group_queue_single <= (group_queue * continuing_queue).rights(:resource => :resource, :xid => :xid)
+    request_pipeline <= group_queue_single.group([:xid, :resource], choose(:mode))
     queue <- request_pipeline
-
   end
 
   # For each read request that comes in, check if we can grant the lock:
@@ -121,7 +111,5 @@ module TwoPhaseLockMgr
     # before getting all of the locks
     ended_xacts <=+ end_xact
     queue <- (queue * end_xact).lefts(:xid => :xid)
-    #write_queue <- (write_queue * end_xact).lefts(:xid => :xid)
-    #read_queue <- (read_queue * end_xact).lefts(:xid => :xid)
   end
 end
