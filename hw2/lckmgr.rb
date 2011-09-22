@@ -45,8 +45,9 @@ module TwoPhaseLockMgr
     scratch :request_pipeline, [:xid, :resource] => [:mode]
   end
 
-  # Some locks have restrictions on the number of locks on a resource,
-  # so doesn't make sense to process more than the allowed amount
+  # To avoid concurrency issues (since accepted lock additions are deferred
+  # until the next timestep), only allow one lock request per resource to be
+  # processed
   bloom :gatekeeper do
     # Add lock requests coming in to the queue
     queue <= request_lock
