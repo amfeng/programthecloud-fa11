@@ -32,7 +32,24 @@ module QuorumKVS
     config <= adjusted_config.notin(config)
   end
 
-  bloom :actions do
+  bloom :route do
+    # Figure out how many machines need to write to, broadcast
+
+    # If write, write to as many machines as needed
+
+    # If read, set up a voting quorum for the necessary amount
+    # of machines
+
+    # If del, write to as many machines as needed (?? do we 
+    # need to delete from every machine?)
+   end
+
+  bloom :receive_requests do
+    # If got a put request over the network, modify own kvs
+
+    # If got a del request over the network, modify own kvs
+
+    # If got a get request over the network, modify own kvs
   end
 end
 
