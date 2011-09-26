@@ -23,6 +23,12 @@ module QuorumKVS
 
   state do
     table :config, [] => [:r_fraction, :w_fraction]
+
+    # Channels for sending requests to other machines
+    channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
+    channel :kvdel_chan, [:@dest, :from] + kvdel.key_cols => kvdel.val_cols
+    channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
+    channel :kvget_response_chan, [:@dest] + kvget_response.key_cols => kvget.val_cols
   end
 
   bloom :set_quorum_config do
@@ -37,12 +43,13 @@ module QuorumKVS
 
   bloom :route do
     # Figure out how many machines need to write to, broadcast
-    numberToWriteTo <= (member.length*config.w_fraction)
+    numberToWriteTo <= (member.length*config.w_fraction).ceil
     
     # If write, write to as many machines as needed
     dump <= member
     machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
-    kvput_chan <= 
+    kvput_chan <= (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
+
     # If read, set up a voting quorum for the necessary amount
     # of machines
 
@@ -51,11 +58,14 @@ module QuorumKVS
    end
 
   bloom :receive_requests do
-    # If got a put request over the network, modify own kvs
-    
-    # If got a del request over the network, modify own kvs
+    # If got a kv modification request, modify own table
+    kvs.kvput <= kvput_chan <= kvput_chan { |k| kvput.schema.map { |c| k.send(c) }}
+    kvs.kvdel <= kvdel_chan <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
+    kvs.kvget <= kget_chan <= kvget_chan { |k| kvget.schema.map { |c| k.send(c) }}
 
-    # If got a get request over the network, modify own kvs
+    # For get requests, send the response back to the original requestor
+    kvget_response_chan <~ (kvget_chan*kvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
+    kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
   end
 end
 
