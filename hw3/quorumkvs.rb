@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'membership/membership'
 require 'ordering/assigner'
-require 'kvs/kvs'
+require 'kvs/mv_kvs'
 
 module QuorumKVSProtocol
   state do
@@ -19,10 +19,11 @@ module QuorumKVS
   include StaticMembership
   include SortAssign
 
-  import BasicKVS => :kvs
+  import BasicMVKVS => :mvkvs
 
   state do
     table :config, [] => [:r_fraction, :w_fraction]
+    scratch :machinesToWrite, [:host] => [:ident]
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
@@ -46,25 +47,30 @@ module QuorumKVS
     numberToWriteTo <= (member.length*config.w_fraction).ceil
     
     # If write, write to as many machines as needed
+    # SortAggAssign assigns sequence numbers to items in the dump collection. 
+    # Once we have sequence numbers we can pick items from the pickup collection with sequence number <= X.
     dump <= member
     machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
     kvput_chan <= (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
 
     # If read, set up a voting quorum for the necessary amount
     # of machines
-
+    kvget_chan <= (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
+    
     # If del, write to as many machines as needed (?? do we 
     # need to delete from every machine?)
    end
 
   bloom :receive_requests do
     # If got a kv modification request, modify own table
-    kvs.kvput <= kvput_chan <= kvput_chan { |k| kvput.schema.map { |c| k.send(c) }}
-    kvs.kvdel <= kvdel_chan <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
-    kvs.kvget <= kget_chan <= kvget_chan { |k| kvget.schema.map { |c| k.send(c) }}
+    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
+    # FIXME: MVKVS does not have a del - we need to add this!
+    # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
+    # FIXME: kvget does not have a client field - we need to add this!
+    # mvkvs.kvget <= kvget_chan { |k| [k.reqid, , k.key, budtime]}
 
     # For get requests, send the response back to the original requestor
-    kvget_response_chan <~ (kvget_chan*kvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
+    kvget_response_chan <~ (kvget_chan*mvkvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
     kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
   end
 end
