@@ -1,6 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'membership/membership'
+require 'ordering/assigner'
 require 'kvs/kvs'
 
 module QuorumKVSProtocol
@@ -16,6 +17,8 @@ end
 module QuorumKVS
   include QuorumKVSProtocol
   include StaticMembership
+  include SortAssign
+
   import BasicKVS => :kvs
 
   state do
@@ -34,9 +37,12 @@ module QuorumKVS
 
   bloom :route do
     # Figure out how many machines need to write to, broadcast
-
+    numberToWriteTo <= (member.length*config.w_fraction)
+    
     # If write, write to as many machines as needed
-
+    dump <= member
+    machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
+    kvput_chan <= 
     # If read, set up a voting quorum for the necessary amount
     # of machines
 
@@ -46,7 +52,7 @@ module QuorumKVS
 
   bloom :receive_requests do
     # If got a put request over the network, modify own kvs
-
+    
     # If got a del request over the network, modify own kvs
 
     # If got a get request over the network, modify own kvs
