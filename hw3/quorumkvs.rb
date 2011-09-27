@@ -28,8 +28,8 @@ module QuorumKVS
     table :config, [] => [:r_fraction, :w_fraction]
     table :getResponsesReceived, [:reqid] => [:key, :value]
     scratch :machinesToWrite, [:host] => [:ident]
-    scratch :numberToWriteTo, [:numberToWriteTo]
-    scratch :numberToReadFrom, [:numberToReadFrom]
+    table :numberToWriteTo, [:num]
+    table :numberToReadFrom, [:num]
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
@@ -46,6 +46,11 @@ module QuorumKVS
        (q.w_fraction == 0 ? 1 : q.w_fraction)] 
     } 
     config <+ adjusted_config.notin(config)
+
+    # Since these numbers will never change, set them now
+    # FIXME: Change to the actual numbers, not percentages
+    numberToWriteTo <= quorum_config {|q| [member.length * q.w_fraction] }
+    numberToReadFrom <= quorum_config {|q| [member.length * q.r_fraction] }
   end
 
   bloom :route do
@@ -56,6 +61,7 @@ module QuorumKVS
     # SortAggAssign assigns sequence numbers to items in the dump collection. 
     # Once we have sequence numbers we can pick items from 
     # the pickup collection with sequence number <= X.
+
     # dump <= member
     # machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
     # kvput_chan <~ (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}

@@ -36,6 +36,12 @@ module VoteCounting
       count[row.reqid] += 1
       count
     }
+    # FIXME: Fix hack to get it to run
+    #counts <= rows.reduce({}) { |count, row|
+    #  count[row.reqid] ||= 0
+    #  count[row.reqid] += 1
+    #}
+    counts <= rows.group([:reqid], count()) 
 
     # Find the reqid's that have enough acks, we can go ahead and choose
     # the value with the higest timestamp from the results
