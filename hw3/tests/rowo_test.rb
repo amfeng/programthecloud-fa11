@@ -1,13 +1,15 @@
 require 'rubygems'
 require 'bud'
 require 'test/unit'
-require 'kvs/rowo'
-require 'kvs/rowa'
+# require 'kvs/rowo'
+# require 'kvs/rowa'
+require '../quorumkvs'
 
 class TestQuorum < Test::Unit::TestCase
   class ROWOBloom
     include Bud
-    include ReadOneWriteOne
+    # include ReadOneWriteOne
+    include QuorumKVS
 
     bootstrap do
       add_member <= [
