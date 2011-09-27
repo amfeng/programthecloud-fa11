@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'membership/membership'
 require 'ordering/assigner'
-require 'kvs/mv_kvs'
+require '../mvkvs_deletes'
 
 module QuorumKVSProtocol
   state do
@@ -20,7 +20,7 @@ module QuorumKVS
   include StaticMembership
   include SortAssign
 
-  import BasicMVKVS => :mvkvs
+  import MVKVSD => :mvkvs
 
   state do
     table :config, [] => [:r_fraction, :w_fraction]
