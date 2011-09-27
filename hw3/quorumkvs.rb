@@ -50,15 +50,16 @@ module QuorumKVS
 
   bloom :route do
     # Figure out how many machines need to write to, broadcast
-    numberToWriteTo <= [(member.length * config.w_fraction).ceil]
+    # numberToWriteTo <= [(member.length * config.w_fraction).ceil]
     
     # If write, write to as many machines as needed
     # SortAggAssign assigns sequence numbers to items in the dump collection. 
     # Once we have sequence numbers we can pick items from 
     # the pickup collection with sequence number <= X.
-    dump <= member
-    machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
-    kvput_chan <~ (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
+    # dump <= member
+    # machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
+    # kvput_chan <~ (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
+    kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
     
     # If read, set up a voting quorum for the necessary amount
     # of machines
@@ -68,7 +69,7 @@ module QuorumKVS
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     
     # voting.numberRequired <= numberToReadFrom
-    voting.numberRequired <= member.length
+    voting.numberRequired <= [[member.length]]
     voting.incomingRows <= kvget_response_chan
 
     kvget_response <= voting.result

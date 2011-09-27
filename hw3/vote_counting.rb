@@ -34,6 +34,7 @@ module VoteCounting
     counts <= rows.reduce({}) { |count, row|
       count[row.reqid] ||= 0
       count[row.reqid] += 1
+      count
     }
 
     # Find the reqid's that have enough acks, we can go ahead and choose
