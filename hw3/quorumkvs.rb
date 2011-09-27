@@ -7,7 +7,7 @@ require 'kvs/mv_kvs'
 module QuorumKVSProtocol
   state do
     interface input, :quorum_config, [] => [:r_fraction, :w_fraction]
-    interface input, :kvput, [:client, :key] => [:reqid, :value]
+    interface input, :kvput, [:key] => [:reqid, :value]
     interface input, :kvdel, [:key] => [:reqid]
     interface input, :kvget, [:reqid] => [:key]
     interface output, :kvget_response, [:reqid] => [:key, :value]
@@ -63,11 +63,14 @@ module QuorumKVS
 
   bloom :receive_requests do
     # If got a kv modification request, modify own table
-    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
+    
+    # FIXME: Not sure what to do about the client field. I think it's from??
+    mvkvs.kvput <= kvput_chan { |k| [k.from, k.key, budtime, k.reqid, k.value]} 
+    mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
+
     # FIXME: MVKVS does not have a del - we need to add this!
+    # FIXME: Do we actually need to implement del also??
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
-    # FIXME: kvget does not have a client field - we need to add this!
-    # mvkvs.kvget <= kvget_chan { |k| [k.reqid, , k.key, budtime]}
 
     # For get requests, send the response back to the original requestor
     kvget_response_chan <~ (kvget_chan*mvkvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
