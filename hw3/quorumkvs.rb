@@ -62,10 +62,13 @@ module QuorumKVS
     
     # If read, set up a voting quorum for the necessary amount
     # of machines
-    numberToReadFrom <= [[(member.length * config.r_fraction).ceil]]
+    # FIXME: Figure out how to calculate numberToReadFrom and get that many machines
+    #        and send a read request to only them
+    # numberToReadFrom <= [[(member.length * config.r_fraction).ceil]]
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     
-    voting.numberRequired <= numberToReadFrom
+    # voting.numberRequired <= numberToReadFrom
+    voting.numberRequired <= member.length
     voting.incomingRows <= kvget_response_chan
 
     kvget_response <= voting.result
@@ -92,7 +95,7 @@ module QuorumKVS
     # If so, find the value for that key that has the largest budtime and put that into kvget_response
     # incomingRows <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
     
-    #kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
+    # kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
   end
 end
 
