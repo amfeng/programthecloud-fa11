@@ -25,6 +25,7 @@ module QuorumKVS
   state do
     table :config, [] => [:r_fraction, :w_fraction]
     scratch :machinesToWrite, [:host] => [:ident]
+    table :getResponsesReceived, [:reqid] => [:key, :value]
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
@@ -53,7 +54,7 @@ module QuorumKVS
     dump <= member
     machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
     kvput_chan <= (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
-
+    
     # If read, set up a voting quorum for the necessary amount
     # of machines
     numberToReadFrom <= (member.length*config.r_fraction).ceil
@@ -71,11 +72,16 @@ module QuorumKVS
     mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
 
     # FIXME: MVKVS does not have a del - we need to add this!
-    # FIXME: Do we actually need to implement del also??
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
 
     # For get requests, send the response back to the original requestor
     kvget_response_chan <~ (kvget_chan*mvkvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
+    
+    # Put the responses that I am getting from kvget_response_chan into a table
+    # Count if the number of responses in this table for that key is >= R.
+    # If so, find the value for that key that has the largest budtime and put that into kvget_response
+    getResponsesReceived <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
+    
     kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
   end
 end
