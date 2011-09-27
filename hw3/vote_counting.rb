@@ -31,9 +31,9 @@ module VoteCounting
   # send the result back 
   bloom :countRows do
     # Count the number of acks received per reqid
-    counts <= rows.reduce({}) { |counts, row|
-      counts[row.reqid] || = 0
-      counts[row.reqid] += 1
+    counts <= rows.reduce({}) { |count, row|
+      count[row.reqid] ||= 0
+      count[row.reqid] += 1
     }
 
     # Find the reqid's that have enough acks, we can go ahead and choose
@@ -52,3 +52,4 @@ module VoteCounting
     # return
     result <= (chosenMax * rows).pairs(:reqid => :reqid, :version => :version) { |c, r| [r.reqid, r.key, r.value] }
   end
+end
