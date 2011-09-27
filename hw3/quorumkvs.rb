@@ -28,8 +28,8 @@ module QuorumKVS
     table :config, [] => [:r_fraction, :w_fraction]
     table :getResponsesReceived, [:reqid] => [:key, :value]
     scratch :machinesToWrite, [:host] => [:ident]
-    scratch :numberToWriteTo, [:numberToWriteTo]
-    scratch :numberToReadFrom, [:numberToReadFrom]
+    table :numberToWriteTo, [:num]
+    table :numberToReadFrom, [:num]
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
@@ -46,23 +46,26 @@ module QuorumKVS
        (q.w_fraction == 0 ? 1 : q.w_fraction)] 
     } 
     config <+ adjusted_config.notin(config)
+
+    # Since these numbers will never change, set them now
+    # FIXME: Change to the actual numbers, not percentages
+    numberToWriteTo <= quorum_config {|q| [member.length * q.w_fraction] }
+    numberToReadFrom <= quorum_config {|q| [member.length * q.r_fraction] }
   end
 
   bloom :route do
     # Figure out how many machines need to write to, broadcast
-    numberToWriteTo <= [(member.length * config.w_fraction).ceil]
     
     # If write, write to as many machines as needed
     # SortAggAssign assigns sequence numbers to items in the dump collection. 
     # Once we have sequence numbers we can pick items from 
     # the pickup collection with sequence number <= X.
     dump <= member
-    machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
+    machinesToWrite <= (numberToWriteTo * pickup).pairs {|num, machine| machine.payload if machine.ident <= num.num}
     kvput_chan <~ (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
     
     # If read, set up a voting quorum for the necessary amount
     # of machines
-    numberToReadFrom <= [[(member.length * config.r_fraction).ceil]]
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     
     voting.numberRequired <= numberToReadFrom

@@ -31,10 +31,12 @@ module VoteCounting
   # send the result back 
   bloom :countRows do
     # Count the number of acks received per reqid
-    counts <= rows.reduce({}) { |count, row|
-      count[row.reqid] ||= 0
-      count[row.reqid] += 1
-    }
+    # FIXME: Fix hack to get it to run
+    #counts <= rows.reduce({}) { |count, row|
+    #  count[row.reqid] ||= 0
+    #  count[row.reqid] += 1
+    #}
+    counts <= rows.group([:reqid], count()) 
 
     # Find the reqid's that have enough acks, we can go ahead and choose
     # the value with the higest timestamp from the results
