@@ -5,8 +5,8 @@ require 'membership/membership'
 module VoteCounting
   state do
     interface input, :incomingRows, [:reqid] => [:key, :value]
-    interface input, :numberRequired, [:requiredNumberOfElements]
-    interface output, :result, [:value]
+    interface input, :numberRequired, [:reqid] => [:requiredNumberOfElements]
+    interface output, :result, [:reqid] => [:value]
   end
 
   bloom do
