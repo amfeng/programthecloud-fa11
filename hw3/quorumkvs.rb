@@ -3,6 +3,7 @@ require 'bud'
 require 'membership/membership'
 require 'ordering/assigner'
 require '../mvkvs_deletes'
+require '../vote_counting'
 
 module QuorumKVSProtocol
   state do
@@ -21,6 +22,7 @@ module QuorumKVS
   include SortAssign
 
   import MVKVSD => :mvkvs
+  import VoteCounting => :voting
 
   state do
     table :config, [] => [:r_fraction, :w_fraction]
@@ -63,6 +65,11 @@ module QuorumKVS
     numberToReadFrom <= [[(member.length * config.r_fraction).ceil]]
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     
+    voting.numberRequired <= numberToReadFrom
+    voting.incomingRows <= kvget_response_chan
+
+    kvget_response <= voting.result
+
     # If del, write to as many machines as needed (?? do we 
     # need to delete from every machine?)
    end
@@ -85,7 +92,7 @@ module QuorumKVS
     # If so, find the value for that key that has the largest budtime and put that into kvget_response
     # incomingRows <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
     
-    kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
+    #kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
   end
 end
 
