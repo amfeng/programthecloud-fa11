@@ -80,7 +80,7 @@ module QuorumKVS
     # Put the responses that I am getting from kvget_response_chan into a table
     # Count if the number of responses in this table for that key is >= R.
     # If so, find the value for that key that has the largest budtime and put that into kvget_response
-    getResponsesReceived <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
+    # <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
     
     kvget_response <= kvget_response_chan{|k| kvget_response.schema.map{|c| k.send(c)}} 
   end
