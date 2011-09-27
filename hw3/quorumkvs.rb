@@ -11,6 +11,7 @@ module QuorumKVSProtocol
     interface input, :kvdel, [:key] => [:reqid]
     interface input, :kvget, [:reqid] => [:key]
     interface output, :kvget_response, [:reqid] => [:key, :value]
+    interface output, :kv_acks, [:reqid]
   end
 end
 
@@ -55,6 +56,7 @@ module QuorumKVS
 
     # If read, set up a voting quorum for the necessary amount
     # of machines
+    numberToReadFrom <= (member.length*config.r_fraction).ceil
     kvget_chan <= (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     
     # If del, write to as many machines as needed (?? do we 
