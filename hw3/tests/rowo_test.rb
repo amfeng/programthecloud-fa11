@@ -8,12 +8,21 @@ class TestQuorum < Test::Unit::TestCase
     include Bud
     include QuorumKVS
 
+    state do
+      table :acks, [:reqid]
+    end
+
     bootstrap do
       add_member <= [
         ['localhost:54321', 1],
         ['localhost:54322', 2],
         ['localhost:54323', 3]
       ]
+    end
+
+    bloom do
+      acks <= kv_acks
+      stdio <~ kvput_chan.inspected
     end
   end
 
@@ -30,10 +39,17 @@ class TestQuorum < Test::Unit::TestCase
     p2.sync_do {p2.quorum_config <+ [[1, 1]]}
     p3.sync_do {p3.quorum_config <+ [[1, 1]]}
 
-    acks = p1.sync_do {p1.kvput <+ [[1, :joe, 1, :hellerstein]]}
-    acks = p2.sync_do {p2.kvput <+ [[2, :peter, 2, :alvaro]]}
-    acks = p3.sync_do {p3.kvput <+ [[3, :joe, 3, :piscopo]]}
-    acks = p3.sync_do {p3.kvput <+ [[3, :peter, 4, :tosh]]}
+    p1.sync_do {p1.kvput <+ [[1, :joe, 1, :hellerstein]]}
+    assert_equal(p1.acks.length, 1)
+
+    p2.sync_do {p2.kvput <+ [[2, :peter, 2, :alvaro]]}
+    assert_equal(p2.acks.length, 1)
+
+    p3.sync_do {p3.kvput <+ [[3, :joe, 3, :piscopo]]}
+    assert_equal(p3.acks.length, 1)
+
+    p3.sync_do {p3.kvput <+ [[3, :peter, 4, :tosh]]}
+    assert_equal(p3.acks.length, 1)
 
     resps = p1.sync_callback(p1.kvget.tabname, [[5, :joe]], p1.kvget_response.tabname)
     assert_equal([[5, "joe", "piscopo"]], resps)

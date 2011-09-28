@@ -8,7 +8,7 @@ require '../vote_counting'
 module QuorumKVSProtocol
   state do
     interface input, :quorum_config, [] => [:r_fraction, :w_fraction]
-    interface input, :kvput, [:key] => [:reqid, :value]
+    interface input, :kvput, [:client, :key] => [:reqid, :value]
     interface input, :kvdel, [:key] => [:reqid]
     interface input, :kvget, [:reqid] => [:key]
     interface output, :kvget_response, [:reqid] => [:key, :value]
@@ -89,6 +89,8 @@ module QuorumKVS
     
     # FIXME: Not sure what to do about the client field. I think it's from??
     mvkvs.kvput <= kvput_chan { |k| [k.from, k.key, budtime, k.reqid, k.value]} 
+    kv_acks <= kvput_chan { |k| [k.reqid] }
+
     mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
 
     # FIXME: MVKVS does not have a del - we need to add this!
