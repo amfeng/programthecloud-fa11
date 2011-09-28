@@ -45,7 +45,6 @@ module VoteCounting
     # Find the max from each group of acks, and send them back
     chosenMax <= chooseMax.group([:reqid], max(:version))
 
-    stdio <~ chosenMax.inspected
     # Join because we're missing the value row from the group by, and
     # return
     result <= (chosenMax * rows).pairs(:reqid => :reqid, :version => :version) { |c, r| [r.reqid, r.key, r.value] }

@@ -99,7 +99,6 @@ module QuorumKVS
 
   bloom :receive_requests do
     # If got a kv modification request, modify own table
-    stdio <~ [["tick #{budtime}"]]
     kvget_queue <= kvget_chan
     
     mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
