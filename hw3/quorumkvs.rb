@@ -33,10 +33,10 @@ module QuorumKVS
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
-    channel :kvput_response_chan, [:@dest] + mvkvs.kvput_response.key_cols => mvkvs.kvput.val_cols
+    # channel :kvput_response_chan, [:@dest] + mvkvs.kvput_response.key_cols => mvkvs.kvput.val_cols
 
     channel :kvdel_chan, [:@dest, :from] + kvdel.key_cols => kvdel.val_cols
-    channel :kvdel_response_chan, [:@dest] + mvkvs.kvdel_response.key_cols => mvkvs.kvdel.val_cols
+    # channel :kvdel_response_chan, [:@dest] + mvkvs.kvdel_response.key_cols => mvkvs.kvdel.val_cols
 
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
     channel :kvget_response_chan, [:@dest] + kvget_response.key_cols => kvget.val_cols
@@ -86,8 +86,8 @@ module QuorumKVS
     kvdel_chan <~ (member * kvdel).pairs{|m,k| [m.host, ip_port] + k}
     
     voting.incomingRows <= kvget_response_chan
-    voting.incomingRows <= kvput_response_chan
-    voting.incomingRows <= kvdel_response_chan
+    # voting.incomingRows <= kvput_response_chan
+    # voting.incomingRows <= kvdel_response_chan
     
     # What do we do about puts and deletes?
     # Maybe return all the reqid's that have been successfully acked - so we can put that in our output interface?
@@ -107,8 +107,9 @@ module QuorumKVS
 
     # For get requests, send the response back to the original requestor
     kvget_response_chan <~ (kvget_chan * mvkvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
-    kvput_response_chan <~ (kvput_chan * mvkvs.kvput_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
-    kvdel_response_chan <~ (kvdel_chan * mvkvs.kvdel_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
+    # kvput_response_chan <~ (kvput_chan * mvkvs.kvput_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
+    # kvdel_response_chan <~ (kvdel_chan * mvkvs.kvdel_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
+
     # If so, find the value for that key that has the largest budtime and put that into kvget_response
     # incomingRows <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
     

@@ -6,6 +6,7 @@ module MVKVSD
   include BasicMVKVS
 
   state do
+    interface input, :kvdel, [:client, :key, :version] => [:reqid]
     interface output, :kvput_response, [:reqid, :key, :version]
     interface output, :kvdel_response, [:reqid, :key, :version]
   end
