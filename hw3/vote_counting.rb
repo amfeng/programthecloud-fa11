@@ -15,6 +15,7 @@ module VoteCounting
     interface input, :incomingRows, [:reqid, :key, :version] => [:value]
     interface input, :numberRequired, [:reqid] => [:requiredNumberOfElements]
     interface output, :result, [:reqid] => [:key, :value]
+    interface output, :ackedReqids, [:reqid]
   end
 
   # Acknowledge that we want to start counting votes for some get request
@@ -27,7 +28,7 @@ module VoteCounting
     rows <= incomingRows
   end
 
-  # For each counting request, ount the rows, and if there are enough,
+  # For each counting request, count the rows, and if there are enough,
   # send the result back 
   bloom :countRows do
     # Count the number of acks received per reqid

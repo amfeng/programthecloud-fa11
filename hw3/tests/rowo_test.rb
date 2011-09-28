@@ -39,16 +39,16 @@ class TestQuorum < Test::Unit::TestCase
     p2.sync_do {p2.quorum_config <+ [[1, 1]]}
     p3.sync_do {p3.quorum_config <+ [[1, 1]]}
 
-    p1.sync_do {p1.kvput <+ [[1, :joe, 1, :hellerstein]]}
+    p1.sync_do {p1.kvput <+ [[:joe, 1, :hellerstein]]}
     assert_equal(p1.acks.length, 1)
 
-    p2.sync_do {p2.kvput <+ [[2, :peter, 2, :alvaro]]}
+    p2.sync_do {p2.kvput <+ [[:peter, 2, :alvaro]]}
     assert_equal(p2.acks.length, 1)
 
-    p3.sync_do {p3.kvput <+ [[3, :joe, 3, :piscopo]]}
+    p3.sync_do {p3.kvput <+ [[:joe, 3, :piscopo]]}
     assert_equal(p3.acks.length, 1)
 
-    p3.sync_do {p3.kvput <+ [[3, :peter, 4, :tosh]]}
+    p3.sync_do {p3.kvput <+ [[:peter, 4, :tosh]]}
     assert_equal(p3.acks.length, 1)
 
     resps = p1.sync_callback(p1.kvget.tabname, [[5, :joe]], p1.kvget_response.tabname)
