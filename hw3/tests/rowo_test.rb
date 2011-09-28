@@ -30,10 +30,15 @@ class TestQuorum < Test::Unit::TestCase
     p2.sync_do {p2.quorum_config <+ [[1, 1]]}
     p3.sync_do {p3.quorum_config <+ [[1, 1]]}
 
-    acks = p1.sync_do {p1.kvput <+ [[1, :joe, 1, :hellerstein]]}
-    acks = p2.sync_do {p2.kvput <+ [[2, :peter, 2, :alvaro]]}
-    acks = p3.sync_do {p3.kvput <+ [[3, :joe, 3, :piscopo]]}
-    acks = p3.sync_do {p3.kvput <+ [[3, :peter, 4, :tosh]]}
+    # acks = p1.sync_do {p1.kvput <+ [[1, :joe, 1, :hellerstein]]}
+    # acks = p2.sync_do {p2.kvput <+ [[2, :peter, 2, :alvaro]]}
+    # acks = p3.sync_do {p3.kvput <+ [[3, :joe, 3, :piscopo]]}
+    # acks = p3.sync_do {p3.kvput <+ [[3, :peter, 4, :tosh]]}
+
+    acks = p1.sync_do {p1.kvput <+ [[:joe, 1, :hellerstein]]}
+    acks = p2.sync_do {p2.kvput <+ [[:peter, 2, :alvaro]]}
+    acks = p3.sync_do {p3.kvput <+ [[:joe, 3, :piscopo]]}
+    acks = p3.sync_do {p3.kvput <+ [[:peter, 4, :tosh]]}
 
     resps = p1.sync_callback(p1.kvget.tabname, [[5, :joe]], p1.kvget_response.tabname)
     assert_equal([[5, "joe", "piscopo"]], resps)
