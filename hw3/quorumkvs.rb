@@ -33,7 +33,11 @@ module QuorumKVS
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
+    channel :kvput_response_chan, [:@dest] + kvput_response.key_cols => kvput.val_cols
+
     channel :kvdel_chan, [:@dest, :from] + kvdel.key_cols => kvdel.val_cols
+    channel :kvdel_response_chan, [:@dest] + kvdel_response.key_cols => kvdel.val_cols
+
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
     channel :kvget_response_chan, [:@dest] + kvget_response.key_cols => kvget.val_cols
   end
@@ -55,7 +59,6 @@ module QuorumKVS
 
   bloom :route do
     # Figure out how many machines need to write to, broadcast
-    # numberToWriteTo <= [(member.length * config.w_fraction).ceil]
     
     # If write, write to as many machines as needed
     # SortAggAssign assigns sequence numbers to items in the dump collection. 
@@ -65,23 +68,30 @@ module QuorumKVS
     # dump <= member
     # machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
     # kvput_chan <~ (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
-    kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
+
     
     # If read, set up a voting quorum for the necessary amount
     # of machines
     # FIXME: Figure out how to calculate numberToReadFrom and get that many machines
     #        and send a read request to only them
     # numberToReadFrom <= [[(member.length * config.r_fraction).ceil]]
-    kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
-    
+
     # voting.numberRequired <= numberToReadFrom
+
+    # If del, write to W many machines
     voting.numberRequired <= [[member.length]]
+
+    kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
+    kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
+    kvdel_chan <~ (member * kvdel).pairs{|m,k| [m.host, ip_port] + k}
+    
     voting.incomingRows <= kvget_response_chan
-
+    voting.incomingRows <= kvput_response_chan
+    voting.incomingRows <= kvdel_response_chan
+    
+    # What do we do about puts and deletes?
+    # Maybe return all the reqid's that have been successfully acked - so we can put that in our output interface?
     kvget_response <= voting.result
-
-    # If del, write to as many machines as needed (?? do we 
-    # need to delete from every machine?)
    end
 
   bloom :receive_requests do
@@ -90,15 +100,15 @@ module QuorumKVS
     # FIXME: Not sure what to do about the client field. I think it's from??
     mvkvs.kvput <= kvput_chan { |k| [k.from, k.key, budtime, k.reqid, k.value]} 
     mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
-
+    mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, budtime, k.reqid]}
+    
     # FIXME: MVKVS does not have a del - we need to add this!
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
 
     # For get requests, send the response back to the original requestor
     kvget_response_chan <~ (kvget_chan * mvkvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
-    
-    # Put the responses that I am getting from kvget_response_chan into a table
-    # Count if the number of responses in this table for that key is >= R.
+    kvput_response_chan <~ (kvput_chan * mvkvs.kvput_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
+    kvdel_response_chan <~ (kvdel_chan * mvkvs.kvdel_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
     # If so, find the value for that key that has the largest budtime and put that into kvget_response
     # incomingRows <= kvget_response_chan {|k| kvget_response.schema.map {|c| k.send(c)}}
     

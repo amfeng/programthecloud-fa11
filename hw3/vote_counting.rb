@@ -27,7 +27,7 @@ module VoteCounting
     rows <= incomingRows
   end
 
-  # For each counting request, ount the rows, and if there are enough,
+  # For each counting request, count the rows, and if there are enough,
   # send the result back 
   bloom :countRows do
     # Count the number of acks received per reqid
