@@ -39,7 +39,8 @@ module QuorumKVS
     # channel :kvdel_response_chan, [:@dest] + mvkvs.kvdel_response.key_cols => mvkvs.kvdel.val_cols
 
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
-    channel :kvget_response_chan, [:@dest] + kvget_response.key_cols => kvget.val_cols
+    table :kvget_queue, [:@dest, :from] + kvget.key_cols => kvget.val_cols
+    channel :kvget_response_chan, [:@dest, :from] + kvget_response.key_cols => kvget.val_cols
   end
 
   bloom :set_quorum_config do
@@ -96,9 +97,13 @@ module QuorumKVS
 
   bloom :receive_requests do
     # If got a kv modification request, modify own table
+    stdio <~ [["tick #{budtime}"]]
+    kvget_queue <= kvget_chan
     
-    # FIXME: Not sure what to do about the client field. I think it's from??
-    mvkvs.kvput <= kvput_chan { |k| [k.from, k.key, budtime, k.reqid, k.value]} 
+    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
+
+    # FIXME: Count number of put acks we got back, right now, blindly sending bakc
+    # ack
     kv_acks <= kvput_chan { |k| [k.reqid] }
 
     mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
@@ -108,7 +113,7 @@ module QuorumKVS
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
 
     # For get requests, send the response back to the original requestor
-    kvget_response_chan <~ (kvget_chan * mvkvs.kvget_response).outer(:reqid => :reqid) { |c, r| [c.from] + r }
+    kvget_response_chan <~ (kvget_queue * mvkvs.kvget_response).pairs(:reqid => :reqid) { |c, r| [c.from, c.dest] + r }
     # kvput_response_chan <~ (kvput_chan * mvkvs.kvput_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
     # kvdel_response_chan <~ (kvdel_chan * mvkvs.kvdel_response).outer(:reqid => :reqid) { |c, r| [c.from] + r}
 
