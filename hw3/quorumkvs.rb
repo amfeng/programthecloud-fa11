@@ -35,7 +35,7 @@ module QuorumKVS
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
     channel :kvput_response_chan, [:@dest] + mvkvs.kvput_response.key_cols => mvkvs.kvput.val_cols
 
-    channel :kvdel_chan, [:@dest, :from] + mvkvs.kvdel.key_cols => mvkvs.kvdel.val_cols
+    channel :kvdel_chan, [:@dest, :from] + kvdel.key_cols => kvdel.val_cols
     channel :kvdel_response_chan, [:@dest] + mvkvs.kvdel_response.key_cols => mvkvs.kvdel.val_cols
 
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
