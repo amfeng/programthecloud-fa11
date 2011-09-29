@@ -25,23 +25,23 @@ class TestQuorum < Test::Unit::TestCase
   end
 
   def test_quorum
-    p1 = QuorumKVSTest.new(:port=>54321)
+    p1 = QuorumKVSTest.new(:port=>54320)
     p1.run_bg
-    p2 = QuorumKVSTest.new(:port=>54322)
+    p2 = QuorumKVSTest.new(:port=>54321)
     p2.run_bg
-    p3 = QuorumKVSTest.new(:port=>54323)
+    p3 = QuorumKVSTest.new(:port=>54322)
     p3.run_bg
-    p4 = QuorumKVSTest.new(:port=>54324)
+    p4 = QuorumKVSTest.new(:port=>54323)
     p4.run_bg
-    p5 = QuorumKVSTest.new(:port=>54325)
+    p5 = QuorumKVSTest.new(:port=>54324)
     p5.run_bg
 
     # Read all, write all (should be consistent)
-    p1.sync_do {p1.quorum_config <+ [[0.55, 0.5]]}
-    p2.sync_do {p2.quorum_config <+ [[0.55, 0.5]]}
-    p3.sync_do {p3.quorum_config <+ [[0.55, 0.5]]}
-    p4.sync_do {p4.quorum_config <+ [[0.55, 0.5]]}
-    p5.sync_do {p5.quorum_config <+ [[0.55, 0.5]]}
+    p1.sync_do {p1.quorum_config <+ [[0, 0]]}
+    p2.sync_do {p2.quorum_config <+ [[0, 0]]}
+    p3.sync_do {p3.quorum_config <+ [[0, 0]]}
+    p4.sync_do {p4.quorum_config <+ [[0, 0]]}
+    p5.sync_do {p5.quorum_config <+ [[0, 0]]}
     
     # Insert a key-value and read from the same machine
     acks = p1.sync_do {p1.kvput <+ [[:A, :anirudh, 1, :todi]]}
