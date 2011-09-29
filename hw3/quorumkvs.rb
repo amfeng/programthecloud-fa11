@@ -31,6 +31,10 @@ module QuorumKVS
     table :numberToWriteTo, [:num]
     table :numberToReadFrom, [:num]
 
+    # This is a table to keep track of the count of writes - used for versioning
+    # table :currentCount, [] => [:count]
+    table :processedReqid, [:reqid]
+
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
     # channel :kvput_response_chan, [:@dest] + mvkvs.kvput_response.key_cols => mvkvs.kvput.val_cols
@@ -41,6 +45,10 @@ module QuorumKVS
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
     table :kvget_queue, [:@dest, :from] + kvget.key_cols => kvget.val_cols
     channel :kvget_response_chan, [:@dest, :from] + kvget_response.key_cols => kvget.val_cols
+  end
+
+  bootstrap do
+    currentCount <= [[0]]
   end
 
   bloom :set_quorum_config do
@@ -95,19 +103,39 @@ module QuorumKVS
     kvget_response <= voting.result
    end
 
+  # bloom :versioning do
+  #   temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
+  #   processedReqid <+ unprocessedPuts {|t| t.reqid} 
+  #   currentCount <+- currentCount {|c| [c.count + unprocessedPuts.length]}
+
+  #   temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
+  #   processedReqid <+ unprocessedDels  {|t| t.reqid}
+  #   currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
+  # end
+
+  bloom :versioning do
+    temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
+    processedReqid <+ unprocessedPuts {|t| t.reqid} 
+    # currentCount <+- currentCount {|c| [c.count + unprocessedPuts.length]}
+
+    temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
+    processedReqid <+ unprocessedDels  {|t| t.reqid}
+    # currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
+  end
+
   bloom :receive_requests do
     # If got a kv modification request, modify own table
     stdio <~ [["tick #{budtime}"]]
     kvget_queue <= kvget_chan
     
-    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
+    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, processedReqid.length, k.reqid, k.value]} 
 
     # FIXME: Count number of put acks we got back, right now, blindly sending bakc
     # ack
     kv_acks <= kvput_chan { |k| [k.reqid] }
 
-    mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
-    mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, budtime, k.reqid]}
+    mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, processedReqid.length]}
+    mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, processedReqid.length, k.reqid]}
     
     # FIXME: MVKVS does not have a del - we need to add this!
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
