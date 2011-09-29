@@ -33,19 +33,18 @@ module QuorumKVS
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
 
     # Channel to send response back to requesting machine
-    channel :kvget_response_chan, [:@dest, :from, :reqid, :key, :version] => [:value] 
     channel :kvput_response_chan, [:@dest, :from, :reqid, :key]
+    channel :kvget_response_chan, [:@dest, :from, :reqid, :key, :version] => [:value] 
 
     # Tables to waiting get/put requests in while we wait for acks
-    table :kvget_queue, [:dest, :from, :reqid]  => [:key]
     scratch :kvput_queue, [:dest, :from, :client]  => [:key, :reqid, :value]
+    table :kvget_queue, [:dest, :from, :reqid]  => [:key]
 
     # TODO: Encapsulate versioning in the KVS itself 
     table :current_version, [] => [:version]
 
     # FIXME: Remove this table, use current_version instead
     # This is a table to keep track of the count of writes - used for versioning
-    # table :currentCount, [] => [:count]
     table :processedReqid, [:reqid]
   end
 

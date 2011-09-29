@@ -25,7 +25,7 @@ module MVKVSD
     }
 
     # Including only the largest version for the key requested
-    #kvget_response <= (kvget * kvstate * matching.group([:key], max[:version])).combos(kvget.key => matching.key, kvstate.key => matching.key, kvstate.version => matching.version) { do |g, s, m| [g.reqid, s.key, s.version, s.value] }
+    # kvget_response <= (kvget * kvstate * matching.group([:key], max[:version])).combos(kvget.key => matching.key, kvstate.key => matching.key, kvstate.version => matching.version) { do |g, s, m| [g.reqid, s.key, s.version, s.value] }
     max_version <= matching.group([:key], max(:version))
     kvget_response <= (matching * max_version).lefts(:key => :key, :version => :version)
   end
