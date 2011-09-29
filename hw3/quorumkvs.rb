@@ -59,11 +59,10 @@ module QuorumKVS
     config <+ adjusted_config.notin(config)
 
     # Since these numbers will never change, set them now
-    # FIXME: Change to the actual numbers, not percentages
-    acks_required <= quorum_config {|q| [:write, member.length * q.w_fraction] }
-    acks_required <= quorum_config {|q| [:read, member.length * q.r_fraction] }
+    acks_required <= config {|q| [:read, member.length * q.r_fraction] }
+    acks_required <= config {|q| [:write, member.length * q.w_fraction] }
 
-    voting.acks_required <= acks_required
+    voting.acks_required <= acks_required {|a| [a.reqtype, a.num.ceil]}
   end
 
   bloom :route do

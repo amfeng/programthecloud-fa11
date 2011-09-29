@@ -34,9 +34,9 @@ class TestQuorum < Test::Unit::TestCase
     p3.run_bg
 
     # Read all, write all (should be consistent)
-    p1.sync_do {p1.quorum_config <+ [[1, 1]]}
-    p2.sync_do {p2.quorum_config <+ [[1, 1]]}
-    p3.sync_do {p3.quorum_config <+ [[1, 1]]}
+    p1.sync_do {p1.quorum_config <+ [[0.6, 0.1]]}
+    p2.sync_do {p2.quorum_config <+ [[0.6, 0.1]]}
+    p3.sync_do {p3.quorum_config <+ [[0.6, 0.1]]}
 
     p1.sync_callback(:kvput, [[:A, :joe, 1, :hellerstein]], :kv_acks)
     p2.sync_callback(:kvput, [[:A, :peter, 2, :alvaro]], :kv_acks)
