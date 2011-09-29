@@ -19,7 +19,6 @@ end
 module QuorumKVS
   include QuorumKVSProtocol
   include StaticMembership
-  include SortAssign
 
   import MVKVSD => :mvkvs
   import VoteCounting => :voting
@@ -45,6 +44,8 @@ module QuorumKVS
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
     table :kvget_queue, [:dest, :from, :reqid]  => [:key]
     channel :kvget_response_chan, [:@dest, :from, :reqid, :key, :version] => [:value] 
+    # TODO: Encapsulate versioning in the KVS itself 
+    table :current_version, [] => [:version]
   end
 
   bloom :set_quorum_config do
@@ -65,49 +66,35 @@ module QuorumKVS
   bloom :route do
     # Figure out how many machines need to write to, broadcast
     
-    # If write, write to as many machines as needed
-    # SortAggAssign assigns sequence numbers to items in the dump collection. 
-    # Once we have sequence numbers we can pick items from 
-    # the pickup collection with sequence number <= X.
-
-    # dump <= member
-    # machinesToWrite <= pickup {|machine| machine.payload if machine.ident <= numberToWriteTo}
-    # kvput_chan <~ (machinesToWrite * kvput).pairs{|m, k| [m.host, ip_port] + k}
-
-    
-    # If read, set up a voting quorum for the necessary amount
-    # of machines
-    # FIXME: Figure out how to calculate numberToReadFrom and get that many machines
-    #        and send a read request to only them
-    # numberToReadFrom <= [[(member.length * config.r_fraction).ceil]]
-
-    # voting.numberRequired <= numberToReadFrom
-
-    # If del, write to W many machines
+    # FIXME: Change to actual number read/write required
     voting.numberRequired <= [[member.length]]
 
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
     kvdel_chan <~ (member * kvdel).pairs{|m,k| [m.host, ip_port] + k}
     
+    # Send get responses to vote counter for counting
     voting.incomingRows <= kvget_response_chan { |r|
       [r.from, r.reqid, r.key, r.version, r.value]
     }
+
+    # Vote counter sends back the result once we've gotten a sufficient
+    # number of acks
+    kvget_response <= voting.result
+
     # voting.incomingRows <= kvput_response_chan
     # voting.incomingRows <= kvdel_response_chan
-    
-    # What do we do about puts and deletes?
-    # Maybe return all the reqid's that have been successfully acked - so we can put that in our output interface?
-    kvget_response <= voting.result
    end
 
+  # FIXME: Redo; set current_version instead
   bloom :versioning do
-    temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
-    processedReqid <+ unprocessedPuts {|t| [t.reqid]} 
+    current_version <+- [[budtime]]
+    #temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
+    #processedReqid <+ unprocessedPuts {|t| [t.reqid]} 
     # currentCount <+- currentCount {|c| [c.count + unprocessedPuts.length]}
 
-    temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
-    processedReqid <+ unprocessedDels  {|t| [t.reqid]}
+    #temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
+    #processedReqid <+ unprocessedDels  {|t| [t.reqid]}
     # currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
   end
 
@@ -115,14 +102,14 @@ module QuorumKVS
     # If got a kv modification request, modify own table
     kvget_queue <= kvget_chan
     
-    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
+    mvkvs.kvput <= (current_version * kvput_chan).pairs { |v, k| [k.client, k.key, v.version, k.reqid, k.value]} 
 
     # FIXME: Count number of put acks we got back, right now, blindly sending bakc
     # ack
     kv_acks <= kvput_chan { |k| [k.reqid] }
 
-    mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
-    mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, budtime, k.reqid]}
+    mvkvs.kvget <= (current_version * kvget_chan).pairs { |v, k| [k.reqid, k.from, k.key, v.version]}
+    #mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, current_version.version, k.reqid]}
     
     # FIXME: MVKVS does not have a del - we need to add this!
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}

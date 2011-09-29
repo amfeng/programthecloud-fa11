@@ -6,8 +6,8 @@ module VoteCounting
   state do
     table :countsRequired, [:numRequired]
     table :rows, [:from, :reqid, :key, :version] => [:value]
-    table :enoughAcks, [:reqid]
 
+    scratch :enoughAcks, [:reqid]
     scratch :counts, [:reqid] => [:number]
     scratch :chooseMax, [:from, :reqid, :key, :version] => [:value]
     scratch :chosenMax, [:reqid] => [:version]
@@ -47,5 +47,7 @@ module VoteCounting
     # Join because we're missing the value row from the group by, and
     # return
     result <= (chosenMax * rows).pairs(:reqid => :reqid, :version => :version) { |c, r| [r.reqid, r.key, r.value] }
+
+    rows <- (chosenMax * rows).rights(:reqid => :reqid, :version => :version) 
   end
 end
