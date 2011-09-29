@@ -67,14 +67,11 @@ module QuorumKVS
   end
 
   bloom :route do
-    stdio <~ [["tick #{budtime}"]]
     # Broadcast to all, then return when have a sufficient number of acks
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
     
     # Send get responses to vote counter for counting
-    #stdio <~ kvget_response_chan.inspected
-    stdio <~ kvget_chan.inspected
     voting.incoming_gets <= kvget_response_chan { |r|
       [r.from, r.reqid, r.key, r.version, r.value]
     }
@@ -113,8 +110,6 @@ module QuorumKVS
     kvget_queue <= kvget_chan
     kvput_queue <= kvput_chan
 
-    stdio <~ kvput_response_chan.inspected
-    
     mvkvs.kvput <= (current_version * kvput_chan).pairs { |v, k| [k.client, k.key, v.version, k.reqid, k.value]} 
     mvkvs.kvget <= (current_version * kvget_chan).pairs { |v, k| [k.reqid, k.from, k.key, v.version]}
     

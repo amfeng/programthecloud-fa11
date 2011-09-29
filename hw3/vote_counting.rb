@@ -27,7 +27,6 @@ module VoteCounting
 
   # Save the rows that come in, so we can count them
   bloom :save_rows do
-    #stdio <~ incoming_puts.inspected
     rows <= incoming_gets {|g| [:read] + g }
     rows <= incoming_puts {|p| [:write] + p }
   end
@@ -64,7 +63,6 @@ module VoteCounting
 
   # Once we have enough acks for a write, send the confirmation
   bloom :process_write do
-    #stdio <~ enough_acks.inspected
     result <= (enough_acks * rows).pairs(:reqtype => :reqtype, :reqid => :reqid) { |a, r|
       [r.reqtype, r.reqid, r.key, :default_value] if r.reqtype == :write
     }
