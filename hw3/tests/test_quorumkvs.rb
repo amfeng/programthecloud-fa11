@@ -25,15 +25,15 @@ class TestQuorum < Test::Unit::TestCase
   end
 
   def test_quorum
-    p1 = QuorumKVSTest.new(:port=>54321)
+    p1 = QuorumKVSTest.new(:port=>54320)
     p1.run_bg
-    p2 = QuorumKVSTest.new(:port=>54322)
+    p2 = QuorumKVSTest.new(:port=>54321)
     p2.run_bg
-    p3 = QuorumKVSTest.new(:port=>54323)
+    p3 = QuorumKVSTest.new(:port=>54322)
     p3.run_bg
-    p4 = QuorumKVSTest.new(:port=>54324)
+    p4 = QuorumKVSTest.new(:port=>54323)
     p4.run_bg
-    p5 = QuorumKVSTest.new(:port=>54325)
+    p5 = QuorumKVSTest.new(:port=>54324)
     p5.run_bg
 
     # Read all, write all (should be consistent)
@@ -54,7 +54,7 @@ class TestQuorum < Test::Unit::TestCase
     assert_equal([[4, "amber", "feng"]], resps)
 
     # Overwrite a previously inserted key-value
-    acks = p2.sync_do {p1.kvput <+ [[:B, :anirudh, 5, :upe]]}
+    acks = p2.sync_do {p1.kvput <+ [[:A, :anirudh, 5, :upe]]}
     resps = p1.sync_callback(p1.kvget.tabname, [[6, :anirudh]], p1.kvget_response.tabname)
     assert_equal([[6, "anirudh", "upe"]], resps)
 
