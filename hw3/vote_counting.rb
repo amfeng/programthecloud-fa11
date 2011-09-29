@@ -15,7 +15,6 @@ module VoteCounting
     interface input, :incomingRows, [:from, :reqid, :key, :version] => [:value]
     interface input, :numberRequired, [:reqid] => [:requiredNumberOfElements]
     interface output, :result, [:reqid] => [:key, :value]
-    interface output, :ackedReqids, [:reqid]
   end
 
   # Acknowledge that we want to start counting votes for some get request
