@@ -69,7 +69,8 @@ class TestQuorum < Test::Unit::TestCase
 
     # Insert a value for a previously deleted key-value
     acks = p2.sync_do {p3.kvput <+ [[:A, :amber, 9, :hkn]]}
-    resps = p2.sync_callback(p3.kvget.tabname, [[10, :amber]], p3.kvget_response.tabname)
+    # resps = p2.sync_callback(p3.kvget.tabname, [[10, :amber]], p3.kvget_response.tabname)
+    resps = p2.sync_callback(:kvget, [[10, :amber]], :kvget_response)
     assert_equal([[10, "amber", "hkn"]], resps)
 
 
