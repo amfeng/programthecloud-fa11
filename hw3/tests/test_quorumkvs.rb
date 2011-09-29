@@ -10,16 +10,16 @@ class TestQuorum < Test::Unit::TestCase
 
     bootstrap do
       add_member <= [
-        ['localhost:54321', 0],
+        ['localhost:54320', 0],
         ['localhost:54321', 1],
         ['localhost:54322', 2],
         ['localhost:54323', 3],
         ['localhost:54324', 4],
         ['localhost:54325', 5],
-        ['localhost:54325', 6],
-        ['localhost:54325', 7],
-        ['localhost:54325', 8],
-        ['localhost:54325', 9],
+        ['localhost:54326', 6],
+        ['localhost:54327', 7],
+        ['localhost:54328', 8],
+        ['localhost:54329', 9],
       ]
     end
   end
@@ -45,7 +45,7 @@ class TestQuorum < Test::Unit::TestCase
     
     # Insert a key-value and read from the same machine
     acks = p1.sync_do {p1.kvput <+ [[:anirudh, 1, :todi]]}
-    resps = p1.sync_callback(p1.kvget.tabname, [[2, :anirudh]], p1.kvget_response.tabname)
+    resps = p1.sync_callback(:kvget, [[2, :anirudh]], :kvget_response)
     assert_equal([[2, "anirudh", "todi"]], resps)
 
     # Insert a key-value and read from a different machine
