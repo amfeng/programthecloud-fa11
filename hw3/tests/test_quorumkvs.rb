@@ -54,7 +54,8 @@ class TestQuorum < Test::Unit::TestCase
     assert_equal([[4, "amber", "feng"]], resps)
 
     # Overwrite a previously inserted key-value
-    acks = p2.sync_do {p1.kvput <+ [[:B, :anirudh, 5, :upe]]}
+    acks = p2.sync_do {p2.kvput <+ [[:A, :anirudh, 5, :upe]]}
+    5.times { p2.tick }
     resps = p1.sync_callback(p1.kvget.tabname, [[6, :anirudh]], p1.kvget_response.tabname)
     assert_equal([[6, "anirudh", "upe"]], resps)
 
@@ -68,7 +69,7 @@ class TestQuorum < Test::Unit::TestCase
     assert_equal([[11, "anirudh", "upe"]], resps)
 
     # Insert a value for a previously deleted key-value
-    acks = p2.sync_do {p3.kvput <+ [[:A, :amber, 9, :hkn]]}
+    acks = p2.sync_do {p2.kvput <+ [[:A, :amber, 9, :hkn]]}
     # resps = p2.sync_callback(p3.kvget.tabname, [[10, :amber]], p3.kvget_response.tabname)
     resps = p2.sync_callback(:kvget, [[10, :amber]], :kvget_response)
     assert_equal([[10, "amber", "hkn"]], resps)

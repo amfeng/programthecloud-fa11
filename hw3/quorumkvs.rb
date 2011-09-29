@@ -68,7 +68,7 @@ module QuorumKVS
     # Broadcast to all, then return when have a sufficient number of acks
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
-    
+
     # Send get responses to vote counter for counting
     voting.incoming_gets <= kvget_response_chan { |r|
       [r.from, r.reqid, r.key, r.version, r.value]

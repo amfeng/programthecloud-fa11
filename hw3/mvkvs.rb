@@ -20,8 +20,6 @@ module VersionMVKVS
       [g.reqid, s.key, s.version, s.value]
     }
 
-    stdio <~ matching.inspected
-
     # Including only the largest version for the key requested
     max_version <= matching.group([:key], max(:version))
     kvget_response <= (matching * max_version).lefts(:key => :key, :version => :version)
