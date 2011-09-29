@@ -10,11 +10,16 @@ class TestQuorum < Test::Unit::TestCase
 
     bootstrap do
       add_member <= [
+        ['localhost:54321', 0],
         ['localhost:54321', 1],
         ['localhost:54322', 2],
-        ['localhost:54323', 3]
-        ['localhost:54324', 4]
-        ['localhost:54325', 5]
+        ['localhost:54323', 3],
+        ['localhost:54324', 4],
+        ['localhost:54325', 5],
+        ['localhost:54325', 6],
+        ['localhost:54325', 7],
+        ['localhost:54325', 8],
+        ['localhost:54325', 9],
       ]
     end
   end
