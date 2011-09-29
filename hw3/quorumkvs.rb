@@ -44,7 +44,7 @@ module QuorumKVS
 
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
     table :kvget_queue, [:@dest, :from] + kvget.key_cols => kvget.val_cols
-    channel :kvget_response_chan, [:@dest, :from] + kvget_response.key_cols => kvget.val_cols
+    channel :kvget_response_chan, [:@dest, :from, :reqid, :key, :version] => [:value] 
   end
 
   bootstrap do
@@ -94,7 +94,9 @@ module QuorumKVS
     kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
     kvdel_chan <~ (member * kvdel).pairs{|m,k| [m.host, ip_port] + k}
     
-    voting.incomingRows <= kvget_response_chan
+    voting.incomingRows <= kvget_response_chan { |r|
+      [r.from, r.reqid, r.key, r.version, r.value]
+    }
     # voting.incomingRows <= kvput_response_chan
     # voting.incomingRows <= kvdel_response_chan
     
@@ -125,7 +127,6 @@ module QuorumKVS
 
   bloom :receive_requests do
     # If got a kv modification request, modify own table
-    stdio <~ [["tick #{budtime}"]]
     kvget_queue <= kvget_chan
     
     mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, processedReqid.length, k.reqid, k.value]} 

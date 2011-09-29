@@ -5,14 +5,14 @@ require 'membership/membership'
 module VoteCounting
   state do
     table :countsRequired, [:numRequired]
-    table :rows, [:reqid, :key, :version] => [:value]
+    table :rows, [:from, :reqid, :key, :version] => [:value]
     table :enoughAcks, [:reqid]
 
     scratch :counts, [:reqid] => [:number]
-    scratch :chooseMax, [:reqid, :key, :version] => [:value]
+    scratch :chooseMax, [:from, :reqid, :key, :version] => [:value]
     scratch :chosenMax, [:reqid] => [:version]
 
-    interface input, :incomingRows, [:reqid, :key, :version] => [:value]
+    interface input, :incomingRows, [:from, :reqid, :key, :version] => [:value]
     interface input, :numberRequired, [:reqid] => [:requiredNumberOfElements]
     interface output, :result, [:reqid] => [:key, :value]
     interface output, :ackedReqids, [:reqid]
@@ -31,17 +31,6 @@ module VoteCounting
   # For each counting request, count the rows, and if there are enough,
   # send the result back 
   bloom :countRows do
-    # Count the number of acks received per reqid
-    counts <= rows.reduce({}) { |count, row|
-      count[row.reqid] ||= 0
-      count[row.reqid] += 1
-      count
-    }
-    # FIXME: Fix hack to get it to run
-    #counts <= rows.reduce({}) { |count, row|
-    #  count[row.reqid] ||= 0
-    #  count[row.reqid] += 1
-    #}
     counts <= rows.group([:reqid], count()) 
 
     # Find the reqid's that have enough acks, we can go ahead and choose

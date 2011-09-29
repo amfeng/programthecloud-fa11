@@ -46,14 +46,14 @@ class TestQuorum < Test::Unit::TestCase
     resps = p1.sync_callback(:kvget, [[5, :joe]], :kvget_response)
     assert_equal([[5, "joe", "piscopo"]], resps)
 
-    #resps = p3.sync_callback(p1.kvget.tabname, [[6, :joe]], p1.kvget_response.tabname)
-    #assert_equal([[6, "joe", "piscopo"]], resps)
+    resps = p3.sync_callback(:kvget, [[6, :joe]], :kvget_response)
+    assert_equal([[6, "joe", "piscopo"]], resps)
 
-    #resps = p1.sync_callback(p1.kvget.tabname, [[7, :peter]], p1.kvget_response.tabname)
-    #assert_equal([[7, "peter", "tosh"]], resps)
+    resps = p1.sync_callback(:kvget, [[7, :peter]], :kvget_response)
+    assert_equal([[7, "peter", "tosh"]], resps)
 
-    #resps = p3.sync_callback(p3.kvget.tabname, [[8, :peter]], p1.kvget_response.tabname)
-    #assert_equal([[8, "peter", "tosh"]], resps)
+    resps = p3.sync_callback(:kvget, [[8, :peter]], :kvget_response)
+    assert_equal([[8, "peter", "tosh"]], resps)
 
     p1.stop
     p2.stop
