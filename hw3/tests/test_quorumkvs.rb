@@ -50,7 +50,7 @@ class TestQuorum < Test::Unit::TestCase
 
     # Insert a key-value and read from a different machine
     acks = p2.sync_do {p2.kvput <+ [[:A, :amber, 3, :feng]]}
-    resps = p3.sync_callback(p3.kvget.tabname, [[4, :amber]], p1.kvget_response.tabname)
+    resps = p3.sync_callback(:kvget, [[4, :amber]], :kvget_response)
     assert_equal([[4, "amber", "feng"]], resps)
 
     # Overwrite a previously inserted key-value
@@ -65,7 +65,7 @@ class TestQuorum < Test::Unit::TestCase
 
     # Check that the value we had inserted long ago is still there and accessible
     resps = p2.sync_callback(p3.kvget.tabname, [[11, :anirudh]], p3.kvget_response.tabname)
-    assert_equal([[12, "anirudh", "upe"]], resps)
+    assert_equal([[11, "anirudh", "upe"]], resps)
 
     # Insert a value for a previously deleted key-value
     acks = p2.sync_do {p3.kvput <+ [[:A, :amber, 9, :hkn]]}

@@ -12,7 +12,7 @@ module QuorumKVSProtocol
     interface input, :kvget, [:reqid] => [:key]
 
     interface output, :kvget_response, [:reqid] => [:key, :value]
-    interface output, :kv_acks, [:reqid] => [:key]
+    interface output, :kv_acks, [:reqid]
   end
 end
 
@@ -87,8 +87,9 @@ module QuorumKVS
     }
     #kv_acks <= kvput {|k| [k.reqid, k.key]}
     kv_acks <= voting.result { |r|
-      [r.reqid, r.key] if r.reqtype == :write
+      [r.reqid] if r.reqtype == :write
     }
+
    end
 
   # FIXME: Redo; set current_version instead
