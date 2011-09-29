@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'test/unit'
-require '../quorumkvs'
+require '../quorum_kvs'
 
 class TestQuorum < Test::Unit::TestCase
   class QuorumKVSTest 
