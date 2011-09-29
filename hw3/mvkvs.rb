@@ -24,5 +24,4 @@ module VersionMVKVS
     max_version <= matching.group([:key], max(:version))
     kvget_response <= (matching * max_version).lefts(:key => :key, :version => :version)
   end
-
 end

@@ -55,7 +55,6 @@ class TestQuorum < Test::Unit::TestCase
 
     # Overwrite a previously inserted key-value
     acks = p2.sync_do {p2.kvput <+ [[:A, :anirudh, 5, :upe]]}
-    5.times { p2.tick }
     resps = p1.sync_callback(p1.kvget.tabname, [[6, :anirudh]], p1.kvget_response.tabname)
     assert_equal([[6, "anirudh", "upe"]], resps)
 
