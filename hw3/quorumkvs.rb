@@ -115,14 +115,14 @@ module QuorumKVS
     # If got a kv modification request, modify own table
     kvget_queue <= kvget_chan
     
-    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, processedReqid.length, k.reqid, k.value]} 
+    mvkvs.kvput <= kvput_chan { |k| [k.client, k.key, budtime, k.reqid, k.value]} 
 
     # FIXME: Count number of put acks we got back, right now, blindly sending bakc
     # ack
     kv_acks <= kvput_chan { |k| [k.reqid] }
 
-    mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, processedReqid.length]}
-    mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, processedReqid.length, k.reqid]}
+    mvkvs.kvget <= kvget_chan { |k| [k.reqid, k.from, k.key, budtime]}
+    mvkvs.kvdel <= kvdel_chan { |k| [k.from, k.key, budtime, k.reqid]}
     
     # FIXME: MVKVS does not have a del - we need to add this!
     # mvkvs.kvdel <= kvdel_chan { |k| kvdel.schema.map { |c| k.send(c) }}
