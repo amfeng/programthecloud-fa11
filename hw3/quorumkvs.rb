@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'membership/membership'
 require 'ordering/assigner'
-require '../mvkvs_deletes'
+require '../mvkvs'
 require '../vote_counting'
 
 module QuorumKVSProtocol
@@ -20,7 +20,7 @@ module QuorumKVS
   include QuorumKVSProtocol
   include StaticMembership
 
-  import MVKVSD => :mvkvs
+  import VersionMVKVS => :mvkvs
   import VoteCounting => :voting
 
   state do
