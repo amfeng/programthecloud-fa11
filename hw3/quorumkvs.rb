@@ -12,7 +12,7 @@ module QuorumKVSProtocol
     interface input, :kvget, [:reqid] => [:key]
 
     interface output, :kvget_response, [:reqid] => [:key, :value]
-    interface output, :kv_acks, [:reqid]
+    interface output, :kv_acks, [:reqid] => [:key]
   end
 end
 
@@ -26,8 +26,7 @@ module QuorumKVS
   state do
     # Config, number to R/W from
     table :config, [] => [:r_fraction, :w_fraction]
-    table :numberToWriteTo, [:num]
-    table :numberToReadFrom, [:num]
+    table :acks_required, [:reqtype] => [:num]
 
     # Channels for sending requests to other machines
     channel :kvput_chan, [:@dest, :from] + kvput.key_cols => kvput.val_cols
@@ -39,7 +38,7 @@ module QuorumKVS
 
     # Tables to waiting get/put requests in while we wait for acks
     table :kvget_queue, [:dest, :from, :reqid]  => [:key]
-    table :kvput_queue, [:dest, :from, :reqid]  => [:key, :value]
+    scratch :kvput_queue, [:dest, :from, :client]  => [:key, :reqid, :value]
 
     # TODO: Encapsulate versioning in the KVS itself 
     table :current_version, [] => [:version]
@@ -61,30 +60,40 @@ module QuorumKVS
 
     # Since these numbers will never change, set them now
     # FIXME: Change to the actual numbers, not percentages
-    numberToWriteTo <= quorum_config {|q| [member.length * q.w_fraction] }
-    numberToReadFrom <= quorum_config {|q| [member.length * q.r_fraction] }
+    acks_required <= quorum_config {|q| [:write, member.length * q.w_fraction] }
+    acks_required <= quorum_config {|q| [:read, member.length * q.r_fraction] }
 
-    # FIXME: Change to actual number read/write required
-    voting.numberRequired <= [[member.length]]
+    voting.acks_required <= acks_required
   end
 
   bloom :route do
+    stdio <~ [["tick #{budtime}"]]
     # Broadcast to all, then return when have a sufficient number of acks
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
     
     # Send get responses to vote counter for counting
-    voting.incomingRows <= kvget_response_chan { |r|
+    #stdio <~ kvget_response_chan.inspected
+    stdio <~ kvget_chan.inspected
+    voting.incoming_gets <= kvget_response_chan { |r|
       [r.from, r.reqid, r.key, r.version, r.value]
     }
 
-    # TODO: Send put responses to vote counter for counting
-    # voting.incomingRows <= kvput_response_chan
+    # Send put responses to vote counter for counting
+    voting.incoming_puts <= kvput_response_chan { |r|
+      [r.from, r.reqid, r.key]
+    }
 
     # Vote counter sends back the result once we've gotten a sufficient
     # number of acks
-    # TODO: Generalize this for both types (read, writes)
-    kvget_response <= voting.result
+    #stdio <~ voting.result.inspected
+    kvget_response <= voting.result { |r| 
+      [r.reqid, r.key, r.value] if r.reqtype == :read 
+    }
+    #kv_acks <= kvput {|k| [k.reqid, k.key]}
+    kv_acks <= voting.result { |r|
+      [r.reqid, r.key] if r.reqtype == :write
+    }
    end
 
   # FIXME: Redo; set current_version instead
@@ -102,17 +111,19 @@ module QuorumKVS
   bloom :receive_requests do
     # If got a kv modification request, modify own table
     kvget_queue <= kvget_chan
+    kvput_queue <= kvput_chan
+
+    stdio <~ kvput_response_chan.inspected
     
     mvkvs.kvput <= (current_version * kvput_chan).pairs { |v, k| [k.client, k.key, v.version, k.reqid, k.value]} 
-
-    # FIXME: Count number of put acks we got back, right now, blindly sending bakc
-    # ack
-    kv_acks <= kvput_chan { |k| [k.reqid] }
-
     mvkvs.kvget <= (current_version * kvget_chan).pairs { |v, k| [k.reqid, k.from, k.key, v.version]}
     
-    # For get requests, send the response back to the original requestor
+    # Send the response back to the original requestor
     kvget_response_chan <~ (kvget_queue * mvkvs.kvget_response).pairs(:reqid => :reqid) { |c, r| [c.from, c.dest] + r }
+    kvput_response_chan <~ kvput_queue { |c| [c.from, c.dest, c.reqid, c.key] }
+
+    # Remove pending requests if they already acked
+    kvget_queue <- (kvget_queue * mvkvs.kvget_response).lefts(:reqid => :reqid) 
   end
 end
 
