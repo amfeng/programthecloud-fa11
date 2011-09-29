@@ -37,11 +37,11 @@ class TestQuorum < Test::Unit::TestCase
     p5.run_bg
 
     # Read all, write all (should be consistent)
-    p1.sync_do {p1.quorum_config <+ [[0.55, 0.5]]}
-    p2.sync_do {p2.quorum_config <+ [[0.55, 0.5]]}
-    p3.sync_do {p3.quorum_config <+ [[0.55, 0.5]]}
-    p4.sync_do {p4.quorum_config <+ [[0.55, 0.5]]}
-    p5.sync_do {p5.quorum_config <+ [[0.55, 0.5]]}
+    p1.sync_do {p1.quorum_config <+ [[0, 0]]}
+    p2.sync_do {p2.quorum_config <+ [[0, 0]]}
+    p3.sync_do {p3.quorum_config <+ [[0, 0]]}
+    p4.sync_do {p4.quorum_config <+ [[0, 0]]}
+    p5.sync_do {p5.quorum_config <+ [[0, 0]]}
     
     # Insert a key-value and read from the same machine
     acks = p1.sync_do {p1.kvput <+ [[:A, :anirudh, 1, :todi]]}
