@@ -43,12 +43,8 @@ module QuorumKVS
     # channel :kvdel_response_chan, [:@dest] + mvkvs.kvdel_response.key_cols => mvkvs.kvdel.val_cols
 
     channel :kvget_chan, [:@dest, :from] + kvget.key_cols => kvget.val_cols
-    table :kvget_queue, [:@dest, :from] + kvget.key_cols => kvget.val_cols
+    table :kvget_queue, [:dest, :from, :reqid]  => [:key]
     channel :kvget_response_chan, [:@dest, :from, :reqid, :key, :version] => [:value] 
-  end
-
-  bootstrap do
-    currentCount <= [[0]]
   end
 
   bloom :set_quorum_config do
@@ -105,23 +101,13 @@ module QuorumKVS
     kvget_response <= voting.result
    end
 
-  # bloom :versioning do
-  #   temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
-  #   processedReqid <+ unprocessedPuts {|t| t.reqid} 
-  #   currentCount <+- currentCount {|c| [c.count + unprocessedPuts.length]}
-
-  #   temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
-  #   processedReqid <+ unprocessedDels  {|t| t.reqid}
-  #   currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
-  # end
-
   bloom :versioning do
     temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
-    processedReqid <+ unprocessedPuts {|t| t.reqid} 
+    processedReqid <+ unprocessedPuts {|t| [t.reqid]} 
     # currentCount <+- currentCount {|c| [c.count + unprocessedPuts.length]}
 
     temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
-    processedReqid <+ unprocessedDels  {|t| t.reqid}
+    processedReqid <+ unprocessedDels  {|t| [t.reqid]}
     # currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
   end
 
