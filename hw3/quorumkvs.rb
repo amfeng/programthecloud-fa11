@@ -94,8 +94,8 @@ module QuorumKVS
 
   # FIXME: Redo; set current_version instead
   bloom :versioning do
-    # current_version <+- [[budtime]]
-    current_version <+- current_version { |c| [c.version + 1]}
+    current_version <+- [[budtime]]
+    # current_version <+- current_version { |c| [c.version + 1]}
     # temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
     # processedReqid <+ unprocessedPuts {|t| [t.reqid]} 
     # current_version <+- current_version {|c| [c.version + unprocessedPuts.length]}
