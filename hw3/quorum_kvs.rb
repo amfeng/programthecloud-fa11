@@ -89,7 +89,6 @@ module QuorumKVS
     kv_acks <= voting.result { |r|
       [r.reqid] if r.reqtype == :write
     }
-
    end
 
   # FIXME: Redo; set current_version instead
@@ -101,8 +100,8 @@ module QuorumKVS
     # processedReqid <+ unprocessedPuts {|t| [t.reqid]} 
     # current_version <+- current_version {|c| [c.version + unprocessedPuts.length]}
 
-    #temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
-    #processedReqid <+ unprocessedDels  {|t| [t.reqid]}
+    # temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
+    # processedReqid <+ unprocessedDels  {|t| [t.reqid]}
     # currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
   end
 
