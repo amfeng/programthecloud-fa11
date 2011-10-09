@@ -45,7 +45,7 @@ module QuorumKVS
 
     # FIXME: Remove this table, use current_version instead
     # This is a table to keep track of the count of writes - used for versioning
-    table :processedReqid, [:reqid]
+    # table :processedReqid, [:reqid]
   end
 
   bloom :set_quorum_config do
@@ -68,7 +68,7 @@ module QuorumKVS
     # Broadcast to all, then return when have a sufficient number of acks
     kvget_chan <~ (member * kvget).pairs{|m,k| [m.host, ip_port] + k}
     kvput_chan <~ (member * kvput).pairs{|m, k| [m.host, ip_port] + k}
-
+    
     # Send get responses to vote counter for counting
     voting.incoming_gets <= kvget_response_chan { |r|
       [r.from, r.reqid, r.key, r.version, r.value]
@@ -89,19 +89,19 @@ module QuorumKVS
     kv_acks <= voting.result { |r|
       [r.reqid] if r.reqtype == :write
     }
-
    end
 
   # FIXME: Redo; set current_version instead
   bloom :versioning do
     current_version <+- [[budtime]]
     # current_version <+- current_version { |c| [c.version + 1]}
+    
     # temp :unprocessedPuts <= kvput.notin(processedReqid, :reqid => :reqid)
     # processedReqid <+ unprocessedPuts {|t| [t.reqid]} 
     # current_version <+- current_version {|c| [c.version + unprocessedPuts.length]}
 
-    #temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
-    #processedReqid <+ unprocessedDels  {|t| [t.reqid]}
+    # temp :unprocessedDels <= kvdel.notin(processedReqid, :reqid => :reqid)
+    # processedReqid <+ unprocessedDels  {|t| [t.reqid]}
     # currentCount <+- currentCount {|c| [c.count + unprocessedDels.length]}
   end
 

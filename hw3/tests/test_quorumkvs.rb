@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'test/unit'
-require '../quorumkvs'
+require '../quorum_kvs'
 
 class TestQuorum < Test::Unit::TestCase
   class QuorumKVSTest 
@@ -15,11 +15,6 @@ class TestQuorum < Test::Unit::TestCase
         ['localhost:54322', 2],
         ['localhost:54323', 3],
         ['localhost:54324', 4]
-        # ['localhost:54325', 5],
-        # ['localhost:54326', 6],
-        # ['localhost:54327', 7],
-        # ['localhost:54328', 8],
-        # ['localhost:54329', 9]
       ]
     end
   end
