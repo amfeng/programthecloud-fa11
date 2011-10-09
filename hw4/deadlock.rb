@@ -14,6 +14,8 @@ module LocalDeadlockDetector
     scratch :path, [:from, :to, :nodes] => []
     scratch :cycle, [:nodes] 
 
+    scratch :victims, [:xid]
+
     interface input, :add_link, [:to, :from]
   end
 
@@ -33,10 +35,12 @@ module LocalDeadlockDetector
     #stdio <~ path.inspected
     # A cycle means that there is some path betwen a node and itself
     # Ex. a -> a
-    cycle <= path { |p| [p.nodes] if p.from == p.to }
+    cycle <= path { |p| [p.nodes.sort] if p.from == p.to }
   end
 
   bloom :break_cycle do
+    # Victim should always be the highest transaction id in the cycle
+    deadlock <= cycle { |c| [c.nodes, c.first.max] }
   end
 
 end
