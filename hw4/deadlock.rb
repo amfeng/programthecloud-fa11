@@ -8,6 +8,34 @@ module DeadlockProtocol
   end
 end
 
+module DDLNodeProtocol
+  state do
+    interface input, :set_coordinator, [:coordinator]
+  end
+end
+
+module DDLNodeCommunicationProtocol
+  state do
+    channel :pipe_channel, [:@dst, :src] => [:from, :to]
+  end
+end
+
+module LockMgrWaitsForGraph
+  include TwoPhaseLockMgr
+
+  state do
+    scratch :waits_for, [:waiter, :waitee]
+  end
+
+  bloom :waits_for do
+    # For each item in the lock queue, figure out what it is waiting for
+    # by which lock is the reason it can't get the resource
+    waits_for <= (queue * locks).pairs(:resource => :resource) { |q, l|
+      [q.xid, l.xid]
+    }
+  end
+end
+
 module LocalDeadlockDetector
   include DeadlockProtocol
    
@@ -47,33 +75,46 @@ module LocalDeadlockDetector
 end
 
 # Because this class includes the LocalDeadlockDetector module, once
-# links are added to the deadlock detector, a deadlock will be reported
-# via the deadlock interface output
-module DLTwoPhase 
-  include TwoPhaseLockMgr
+# links are added, a deadlock will be reported via the deadlock output 
+module DLLockManager
   include LocalDeadlockDetector
+  include LockMgrWaitsForGraph
 
-  state do
-    scratch :waits_for, [:waiter, :waitee]
-  end
-
-  bloom :waits_for do
-    # For each item in the lock queue, figure out what it is waiting for
-    # by which lock is the reason it can't get the resource
-    waits_for <= (queue * locks).pairs(:resource => :resource) { |q, l|
-      [q.xid, l.xid]
-    }
-
+  bloom :send_graph do
     # Add the waits-for graph
     add_links <= waits_for
   end
 end
 
 module DDLNode
-  include LocalDeadlockDetector
+  include DDLNodeProtocol
+  include DDLNodeCommunicationProtocol
+
+  state do
+    table :coordinator, [] => [:coordinator]
+  end
+
+  bloom :set_coordinator do
+    coordinator <= set_coordinator 
+  end
+  
+  bloom :send_graph do
+    pipe_channel <~ (coordinator * waits_for).pairs { |c, w|
+      [c.coordinator, ip_port, w.from, w.to]
+    }
+  end
 end
 
+# Because this class includes the LocalDeadlockDetector module, once
+# links are added, a deadlock will be reported via the deadlock output 
 module DDLMaster
-  include DeadlockProtocol
+  include DDLNodeCommunicationProtocol
+  include LocalDeadlockDetector
+
+  bloom :apply_graph do
+    # FIXME: If not all graphs come in at once, problem (this solution
+    # only assuming 1 total timestep)
+    add_link <= pipe_channel { |p| [p.from, p.to] }
+  end
 end
 
