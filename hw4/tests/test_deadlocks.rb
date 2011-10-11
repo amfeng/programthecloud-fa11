@@ -2,10 +2,12 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 require '../deadlock'
+require '../lckmgr'
 
 class TestDeadlocks < Test::Unit::TestCase
   class LocalDeadlockDetectorTest
     include Bud
+    include TwoPhaseLockMgr
     include LocalDeadlockDetector
   end
 

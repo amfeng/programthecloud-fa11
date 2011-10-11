@@ -1,3 +1,5 @@
+require '../lckmgr'
+
 module DeadlockProtocol
   # A deadlock detection protocol outputs an array of mutually deadlocked
   # transaction ids, and a chosen victim.
@@ -10,7 +12,7 @@ module LocalDeadlockDetector
   include DeadlockProtocol
    
   state do
-    table :link, [:from, :to] => []
+    scratch :link, [:from, :to] => []
     scratch :path, [:from, :to, :nodes] => []
     scratch :cycle, [:nodes] 
 
@@ -42,7 +44,29 @@ module LocalDeadlockDetector
     # Victim should always be the highest transaction id in the cycle
     deadlock <= cycle { |c| [c.nodes, c.first.max] }
   end
+end
 
+# Because this class includes the LocalDeadlockDetector module, once
+# links are added to the deadlock detector, a deadlock will be reported
+# via the deadlock interface output
+module DLTwoPhase 
+  include TwoPhaseLockMgr
+  include LocalDeadlockDetector
+
+  state do
+    scratch :waits_for, [:waiter, :waitee]
+  end
+
+  bloom :waits_for do
+    # For each item in the lock queue, figure out what it is waiting for
+    # by which lock is the reason it can't get the resource
+    waits_for <= (queue * locks).pairs(:resource => :resource) { |q, l|
+      [q.xid, l.xid]
+    }
+
+    # Add the waits-for graph
+    add_links <= waits_for
+  end
 end
 
 module DDLNode
