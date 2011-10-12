@@ -46,7 +46,7 @@ module LocalDeadlockDetector
 
     scratch :victims, [:xid]
 
-    interface input, :add_link, [:to, :from]
+    interface input, :add_link, [:from, :to]
   end
 
   bloom :add_links do
