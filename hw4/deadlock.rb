@@ -111,9 +111,11 @@ module DDLMaster
   include DDLNodeCommunicationProtocol
   include LocalDeadlockDetector
 
+  state do
+    table :link, [:from, :to] => []
+  end
+
   bloom :apply_graph do
-    # FIXME: If not all graphs come in at once, problem (this solution
-    # only assuming 1 total timestep)
     add_link <= pipe_channel { |p| [p.from, p.to] }
   end
 end
