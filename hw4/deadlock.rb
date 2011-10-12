@@ -112,9 +112,9 @@ module DDLMaster
   include DDLNodeCommunicationProtocol
   include LocalDeadlockDetector
 
-  state do
-    table :link, [:from, :to] => []
-  end
+  # state do
+  #   table :link, [:from, :to] => []
+  # end
 
   bloom :apply_graph do
     add_link <= pipe_channel { |p| [p.from, p.to] }
