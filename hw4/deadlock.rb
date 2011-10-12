@@ -89,6 +89,7 @@ end
 module DDLNode
   include DDLNodeProtocol
   include DDLNodeCommunicationProtocol
+  include LockMgrWaitsForGraph
 
   state do
     table :coordinator, [] => [:coordinator]
@@ -100,7 +101,7 @@ module DDLNode
   
   bloom :send_graph do
     pipe_channel <~ (coordinator * waits_for).pairs { |c, w|
-      [c.coordinator, ip_port, w.from, w.to]
+      [c.coordinator, ip_port, w.waiter, w.waitee]
     }
   end
 end
