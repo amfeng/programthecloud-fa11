@@ -37,15 +37,14 @@ class TestDistributedDeadlocks < Test::Unit::TestCase
     node2 = DistributedDeadlockDetectorTest.new(:port=>54322)
     node2.run_bg
 
-    node1.sync_do {node1.set_coordinator <+ [["54320"]]}
-    node2.sync_do {node2.set_coordinator <+ [["54320"]]}
+    node1.sync_do {node1.set_coordinator <+ [["localhost:54320"]]}
+    node2.sync_do {node2.set_coordinator <+ [["localhost:54320"]]}
 
     node1.sync_do {}
     node2.sync_do {}
     master.sync_do {}
 
     master.register_callback(:deadlock) do |cb|
-      assert_equal(1,1)
       cb.each do |row|
         assert_equal('4', row.victim)
       end
