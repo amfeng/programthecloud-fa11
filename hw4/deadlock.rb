@@ -16,7 +16,7 @@ end
 
 module DDLNodeCommunicationProtocol
   state do
-    channel :pipe_channel, [:@dst, :src] => [:from, :to]
+    channel :pipe_channel, [:@dst, :src, :from, :to] => []
   end
 end
 
@@ -40,7 +40,7 @@ module LocalDeadlockDetector
   include DeadlockProtocol
    
   state do
-    scratch :link, [:from, :to] => []
+    table :link, [:from, :to] => []
     scratch :path, [:from, :to, :nodes] => []
     scratch :cycle, [:nodes] 
 
@@ -111,10 +111,6 @@ end
 module DDLMaster
   include DDLNodeCommunicationProtocol
   include LocalDeadlockDetector
-
-  # state do
-  #   table :link, [:from, :to] => []
-  # end
 
   bloom :apply_graph do
     add_link <= pipe_channel { |p| [p.from, p.to] }
