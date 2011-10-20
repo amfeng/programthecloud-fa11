@@ -16,4 +16,14 @@ module AgreementConfig
     interface input :resume_participant, [:reqid, :partid]
     interface output :ack, [:reqid]
   end
+
+  bloom :route do
+    # Broadcast commit_request to all the participants in the member table
+
+    # If all the participants send a "Yes to commit" ack back - send a "commit"
+    # request to all the participants
+
+    # Once all the participants send back a "commited" ack, then the coordinator
+    # can put a commit message in the commit_response output interface
+  end
 end
