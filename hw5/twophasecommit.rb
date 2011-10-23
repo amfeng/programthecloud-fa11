@@ -10,7 +10,7 @@ end
 
 module AgreementConfigProtocol
   state do
-    interface input :add_participant, [:ident] => [:host]
+    interface input :add_participant, [:reqid, :partid] => [:host]
     interface input :delete_participant, [:reqid, :partid]
     interface input :pause_participant, [:reqid, :partid]
     interface input :resume_participant, [:reqid, :partid]
@@ -64,30 +64,30 @@ module TwoPCCoordinator
   state do
     # Keep track of ident -> host, since members table holds the 
     # reverse only
-    table :participants, [:ident] => [:host]
+    table :participants, [:reqid, :partid] => [:host]
   end
 
   bloom :participant_control do
     # Adding participants
     participants <= add_participant
-    rm.add_member <= add_participant { |p| [p.host, p.ident] }
+    rm.add_member <= add_participant { |p| [p.host, p.partid] }
     ack <+ add_participant { |r| r.reqid }
 
     # Pausing participants 
-    pause <= (pause_participant * participants).pairs(:partid => :ident) { |r, p|
+    pause <= (pause_participant * participants).pairs(:partid => :partid) { |r, p|
       [p.host, ip_port, r.reqid]
     }
 
     # Unpausing participants 
-    unpause <= (resume_participant * participants).pairs(:partid => :ident) { |r, p|
+    unpause <= (resume_participant * participants).pairs(:partid => :partid) { |r, p|
       [p.host, ip_port, r.reqid]
     }
 
     ack <= control_acks
 
     # Deleting participants
-    rm.member <- (delete_participant * participants) { |p| [p.host, p.ident] }
-    participants <- (delete_participant * participants) { |p| [p.host, p.ident] }
+    rm.member <- (delete_participant * participants).pairs(:partid => :partid) { |r, p| [p.host, p.partid] }
+    participants <- (delete_participant * participants).paird(:partid => :partid) { |p| [p.reqid, p.partid, p.host] }
     ack <+ delete_participant { |r| r.reqid }
     
   end
