@@ -32,7 +32,7 @@ module TwoPCParticipant
 
   state do
     table :active, [] => [:active]
-    table :active_ballot, ballots.schema
+    table :active_ballot, ballot.schema
   end
 
   bootstrap do
@@ -42,6 +42,7 @@ module TwoPCParticipant
   bloom :decide do
     # Only reply to ballots if participant is currently active
     active_ballot <= (ballot * active).lefts
+    # If participant active, then reply back saying "yes" to commit
     cast_vote <= active_ballot { |b| [b.ident, :yes] } 
   end
 
@@ -58,13 +59,15 @@ module TwoPCCoordinator
   include TwoPCCoordinatorProtocol
   include AgreementConfigProtocol
   include ParticipantControlProtocol
-  import VotingMaster => vm
+  include TwoPCVotingCounting
   import Multicast => rm
 
   state do
     # Keep track of ident -> host, since members table holds the 
     # reverse only
     table :participants, [:reqid, :partid] => [:host]
+    scratch :phase_one_response, result.schema
+    scratch :phase_two_response, result.schema
   end
 
   bloom :participant_control do
@@ -92,6 +95,10 @@ module TwoPCCoordinator
     
   end
 
+  bloom :done_mcast do
+    rm.mcast_done <= pipe_sent {|p| [p.dst, p.ident, p.payload] }
+  end
+
   bloom :broadcast do
     # TODO: Why do we need both voting and broadcasting? Voting looks like
     # it already broadcasts on begin_vote
@@ -103,10 +110,24 @@ module TwoPCCoordinator
     # If all the participants send a "Yes to commit" ack back - send a "commit"
     # request to all the participants
     # TODO
+    # Pipe the acked messages coming from the participants into voting's input
+    phase_one_acks <= rm.mcast_done
+    phase_one_response <= result
+
+    rm.send_mcast <= (commit_request * phase_one_response) { |r, p|
+      if p.response == :yes
+        [ r.reqid, :commit] 
+      else
+        [r.reqid, :abort]
+      end
+    }
+    phase_two_acks <= rm.mcast_done
 
     # Once all the participants send back a "commited" ack, then the coordinator
     # can put a commit message in the commit_response output interface
     # TODO
+    phase_two_response <= result
+    commit_response <= phase_two_response
 
     # TODO: Failure detection
   end
