@@ -100,23 +100,21 @@ module TwoPCCoordinator
   end
 
   bloom :broadcast do
-    # TODO: Why do we need both voting and broadcasting? Voting looks like
-    # it already broadcasts on begin_vote
     # Broadcast commit_request to all the participants in the member table
+    acks_required <= [member.length]
     rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
   end 
 
   bloom :reply do
     # If all the participants send a "Yes to commit" ack back - send a "commit"
     # request to all the participants
-    # TODO
     # Pipe the acked messages coming from the participants into voting's input
     phase_one_acks <= rm.mcast_done
-    phase_one_response <= result
+    phase_one_response <= phase_one_voting_result
 
     rm.send_mcast <= (commit_request * phase_one_response) { |r, p|
       if p.response == :yes
-        [ r.reqid, :commit] 
+        [r.reqid, :commit] 
       else
         [r.reqid, :abort]
       end
@@ -125,8 +123,7 @@ module TwoPCCoordinator
 
     # Once all the participants send back a "commited" ack, then the coordinator
     # can put a commit message in the commit_response output interface
-    # TODO
-    phase_two_response <= result
+    phase_two_response <= phase_two_voting_result
     commit_response <= phase_two_response
 
     # TODO: Failure detection

@@ -15,7 +15,8 @@ module TwoPCVoteCounting
     interface input, :phase_two_acks, [:from, :ident] => [:payload]
 
     interface input, :acks_required, [:num]
-    interface output, :result, [:ident, :phase] => [:value]
+    interface output, :phase_one_voting_result, [:ident, :phase] => [:value]
+    interface output, :phase_two_voting_result, [:ident, :phase] => [:value]
   end
 
   # Acknowledge that we want to start counting votes for some get request
@@ -52,7 +53,14 @@ module TwoPCVoteCounting
   end
 
   bloom :process_enough_acks do
-    result <= (enough_acks * rows).pairs(:ident => :ident) { |e,r| [e.ident, e.phase, e.payload] }
+    phase_one_voting_result <= (enough_acks * rows).pairs(:ident => :ident) { 
+      |e,r| [e.ident, e.phase, e.payload] if e.phase = :phase_one
+    }
+    
+    phase_two_voting_result <= (enough_acks * rows).pairs(:ident => :ident) { 
+      |e,r| [e.ident, e.phase, e.payload] if e.phase = :phase_two
+    }
+    
     rows <- (enough_acks * rows).rights(:ident => :ident)
   end
 end
