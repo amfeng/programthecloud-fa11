@@ -1,5 +1,9 @@
 require 'rubygems'
 require 'bud'
+require 'voting/voting'
+require 'delivery/multicast'
+require 'membership/membership'
+require 'new_voting'
 
 module TwoPCCoordinatorProtocol
   state do
