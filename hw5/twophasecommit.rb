@@ -107,15 +107,14 @@ module TwoPCCoordinator
 
   bloom :reply do
     # If all participants can commit, decide to commit. Else, abort.
-    vm.phase_one_acks <= rm.mcast_done
+    vm.phase_one_acks <= rm.mcast_done # FIXME
     commit_response <= vm.phase_two_voting_result
 
-    phase_two_acks <= rm.mcast_done
+    # TODO: Broadcast decision to the nodes
+    vm.phase_two_acks <= rm.mcast_done # FIXME
 
-    # Once all the participants send back a "commited" ack, then the coordinator
-    # can put a commit message in the commit_response output interface
+    # TODO: Clean up once we have received all the acks for
+    # Phase 2
     phase_two_response <= phase_two_voting_result
-    commit_response <= phase_two_response
-
   end
 end
