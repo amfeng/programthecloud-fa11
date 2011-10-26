@@ -43,6 +43,8 @@ module TwoPCParticipant
     # Only reply to ballots if participant is currently active
     active_ballot <= (ballot * active).lefts
     # If participant active, then reply back saying "yes" to commit
+
+    # FIXME: Make this use ReliableDelivery instead
     cast_vote <= active_ballot { |b| [b.ident, :yes] } 
   end
 
