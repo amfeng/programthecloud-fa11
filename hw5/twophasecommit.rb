@@ -65,8 +65,8 @@ module TwoPCCoordinator
   include TwoPCCoordinatorProtocol
   include AgreementConfigProtocol
   include ParticipantControlProtocol
-  import TwoPCVotingCounting => vc
-  import ReliableMulticast => rm
+  import TwoPCVoteCounting => :vc
+  import ReliableMulticast => :rm
 
   state do
     # Keep track of ident -> host, since members table holds the 

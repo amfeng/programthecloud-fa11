@@ -21,35 +21,35 @@ class Test2PC < Test::Unit::TestCase
                                        [4, 4, 'localhost:54323']]}
     
     # Broadcast a commit request - it should succeed
-    resps = p1.sync_callback (:commit_request, [[5]], :commit_response)
+    resps = p1.sync_callback(:commit_request, [[5]], :commit_response)
     assert_equal([["C"]], resps)
     
     # Pause participant 1
     p1.sync_callback {p1.pause_participant <+ [[6,1]]}
     
     # Broadcast a commit request - it should fail
-    resps = p1.sync_callback (:commit_request, [[7]], :commit_response)
+    resps = p1.sync_callback(:commit_request, [[7]], :commit_response)
     assert_equal([["A"]], resps)
 
     # Delete participant 1 now
     p1.sync_callback {p1.delete_participant <+ [[8,1]]}
 
     # Broadcast a commit request - it should succeed
-    resps = p1.sync_callback (:commit_request, [[9]], :commit_response)
+    resps = p1.sync_callback(:commit_request, [[9]], :commit_response)
     assert_equal([["C"]], resps)
 
     # Pause a participant 2
     p1.sync_callback {p1.pause_participant <+ [[10,2]]}
     
     # Broadcast a commit request - it should fail
-    resps = p1.sync_callback (:commit_request, [[11]], :commit_response)
+    resps = p1.sync_callback(:commit_request, [[11]], :commit_response)
     assert_equal([["A"]], resps)
 
     # Resume participant 2
     p1.sync_callback {p1.pause_participant <+ [[12,2]]}
     
     # Broadcast a commit request - it should succeed
-    resps = p1.sync_callback (:commit_request, [[13]], :commit_response)
+    resps = p1.sync_callback(:commit_request, [[13]], :commit_response)
     assert_equal([["C"]], resps)
 
     p1.stop

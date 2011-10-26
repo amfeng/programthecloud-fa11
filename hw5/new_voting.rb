@@ -50,7 +50,7 @@ module TwoPCVoteCounting
     }
 
     # Find the reqid's that have enough :yes acks
-    phase_one_voting_result <= (counts * num_required) { |c, r|
+    phase_one_voting_result <= (counts * num_required).pairs { |c, r|
       [c.reqid, :C] if (c.num == r.num and 
                                         c.phase == :phase_one and 
                                         c.payload == :yes)
@@ -58,7 +58,7 @@ module TwoPCVoteCounting
 
     # Abort if we time out
     timed_out <= req_table { |r|
-      [r.reqid] if r.phase == :phase one and r.timeout <= 0 
+      [r.reqid] if r.phase == :phase_one and r.timeout <= 0 
     }
 
     phase_one_voting_result <= timed_out { |t| [t.reqid, :A] }
@@ -67,7 +67,7 @@ module TwoPCVoteCounting
 
   # Count the acks we get back after phase 2
   bloom :phase_two do
-    phase_two_voting_result <= (counts * num_required) { |c, r|
+    phase_two_voting_result <= (counts * num_required).pairs { |c, r|
       [c.reqid, :committed] if (c.num == r.num and 
                                         c.phase == :phase_two and 
                                         c.payload == :committed)
