@@ -36,29 +36,29 @@ module TwoPCVoteCounting
 
     # Find the reqid's that have enough :yes or :committed acks
     enough_acks <= (counts * num_required) { |c, r|
-      [c.ident, c.phase, c.payload] if (c.num = r.num and 
-                                        c.phase = :phase_one and 
-                                        c.payload = :yes)
+      [c.ident, c.phase, c.payload] if (c.num == r.num and 
+                                        c.phase == :phase_one and 
+                                        c.payload == :yes)
     }
     enough_acks <= (counts * num_required) { |c, r|
-      [c.ident, c.phase, c.payload] if (c.num = r.num and 
-                                        c.phase = :phase_two and 
-                                        c.payload = :committed)
+      [c.ident, c.phase, c.payload] if (c.num == r.num and 
+                                        c.phase == :phase_two and 
+                                        c.payload == :committed)
     }
     # If a reqid has a :no to commit or :aborted ack - we can stop
     enough_acks <= (counts * num_required) { |c, r| 
-      [c.ident, c.phase, c.payload] if (c.payload = :no or 
-                                        c.payload = :aborted)
+      [c.ident, c.phase, c.payload] if (c.payload == :no or 
+                                        c.payload == :aborted)
     }
   end
 
   bloom :process_enough_acks do
     phase_one_voting_result <= (enough_acks * rows).pairs(:ident => :ident) { 
-      |e,r| [e.ident, e.phase, e.payload] if e.phase = :phase_one
+      |e,r| [e.ident, e.phase, e.payload] if e.phase == :phase_one
     }
     
     phase_two_voting_result <= (enough_acks * rows).pairs(:ident => :ident) { 
-      |e,r| [e.ident, e.phase, e.payload] if e.phase = :phase_two
+      |e,r| [e.ident, e.phase, e.payload] if e.phase == :phase_two
     }
     
     rows <- (enough_acks * rows).rights(:ident => :ident)
