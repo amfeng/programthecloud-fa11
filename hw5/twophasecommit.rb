@@ -49,7 +49,6 @@ module TwoPCParticipant
 
     # FIXME: Make this use ReliableDelivery instead
     #cast_vote <= active_ballot { |b| [b.ident, :yes] } 
-    stdio <~ pipe_out.inspected
     pipe_in <= pipe_out { |p| [p.src, p.dst, p.ident, :yes] }
   end
 
