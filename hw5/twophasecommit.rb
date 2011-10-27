@@ -110,7 +110,6 @@ module TwoPCCoordinator
     # If all participants can commit, decide to commit. Else, abort.
     vc.phase_one_acks <= pipe_out { |p| [p.src, p.ident, p.payload] }
     commit_response <= vc.phase_one_voting_result
-    stdio <~ commit_response.inspected
 
     # Broadcast decision to the nodes
     #rm.send_mcast <= (commit_request * commit_response)

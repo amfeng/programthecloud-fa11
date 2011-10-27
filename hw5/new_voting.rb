@@ -49,8 +49,6 @@ module TwoPCVoteCounting
       [r.reqid, :A] if a.payload == "no" and r.phase == :phase_one     
     }
 
-    stdio <~ phase_one_acks.inspected
-
     # Find the reqid's that have enough :yes acks
     phase_one_voting_result <= (counts * req_table).pairs { |c, r|
       [c.reqid, :C] if (c.num == r.num and 

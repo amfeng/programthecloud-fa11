@@ -9,7 +9,8 @@ class Test2PC < Test::Unit::TestCase
     include TwoPCCoordinator
 
     bootstrap do
-      add_participant <= [[1, 1, "localhost:54320"]]
+      add_participant <= [[1, 1, "localhost:54320"],
+                          [2, 2, "localhost:54321"]]
     end
   end
 
@@ -21,9 +22,11 @@ class Test2PC < Test::Unit::TestCase
   def test_twopc
     coord = Coordinator.new(:port => 12345)
     p1 = Participant.new(:port => 54320)
+    p2 = Participant.new(:port => 54321)
 
     coord.run_bg
     p1.run_bg
+    p2.run_bg
 
     # Broadcast a commit request - it should succeed
     resps = coord.sync_callback(:commit_request, [[1]], :commit_response)
