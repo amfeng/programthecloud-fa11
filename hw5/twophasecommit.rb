@@ -108,16 +108,23 @@ module TwoPCCoordinator
     # Send decision to the client
     commit_response <= vc.phase_one_voting_result
 
-=begin
+    # Commented out because we're using the reqid as the ident, but
+    # that causes a key conflict since everything happens on the
+    # same timestep. We could either 1) Add a <+ somewhere (but this
+    # is not desirable if we could do it in an "instant" instead, or 2)
+    # manufacture reqids (this seems incorrect since the participants
+    # wouldn't know which reqid each request corresponded to).
+
     # Broadcast decision to the nodes
-    pipe_in <= (member * commit_response).pairs { |m, r|
-      if r.status == :C
-        [m.host, ip_port, r.reqid, :commit] unless m.host == ip_port
-      else
-        [m.host, ip_port, r.reqid, :abort] unless m.host == ip_port
-      end
-    }
-=end   
+    #pipe_in <= (member * commit_response).pairs { |m, r|
+    #  if r.status == :C
+    #    [m.host, ip_port, r.reqid, :commit] unless m.host == ip_port
+    #  else
+    #    [m.host, ip_port, r.reqid, :abort] unless m.host == ip_port
+    #  end
+    #}
+
+    # Commented out for similar reasons as above
 
     # TODO: Count acks from Phase 2
     # TODO: Clean up once we have received all the acks for
