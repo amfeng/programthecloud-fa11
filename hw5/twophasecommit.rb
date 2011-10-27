@@ -13,18 +13,17 @@ module TwoPCCoordinatorProtocol
 end
 
 module AgreementConfigProtocol
-  import ReliableDelivery => :rd
-
   state do
     interface input, :add_participant, [:reqid, :partid] => [:host]
     interface input, :delete_participant, [:reqid, :partid]
     interface input, :pause_participant, [:reqid, :partid]
     interface input, :resume_participant, [:reqid, :partid]
-    interface output, :ack, [:reqid]
+    interface output, :acks, [:reqid]
   end
 end
 
 module ParticipantControlProtocol
+  include ReliableDelivery 
   state do
     channel :to_pause, [:@to, :from, :reqid]
     channel :to_unpause, [:@to, :from, :reqid]
@@ -33,7 +32,6 @@ module ParticipantControlProtocol
 end
 
 module TwoPCParticipant
-  include VotingAgent
   include ParticipantControlProtocol
 
   state do
@@ -47,11 +45,12 @@ module TwoPCParticipant
 
   bloom :decide do
     # Only reply to ballots if participant is currently active
-    active_ballot <= (ballot * active).lefts
+    #active_ballot <= (ballot * active).lefts
     # If participant active, then reply back saying "yes" to commit
 
     # FIXME: Make this use ReliableDelivery instead
-    cast_vote <= active_ballot { |b| [b.ident, :yes] } 
+    #cast_vote <= active_ballot { |b| [b.ident, :yes] } 
+    pipe_in <= pipe_out 
   end
 
   bloom :control do
@@ -81,50 +80,44 @@ module TwoPCCoordinator
   bloom :participant_control do
     # Adding participants
     participants <= add_participant
-    rm.add_member <= add_participant { |p| [p.host, p.partid] }
-    ack <+ add_participant { |r| r.reqid }
+    add_member <= add_participant { |p| [p.host, p.partid] }
+    acks <+ add_participant { |r| [r.reqid] }
 
     # Pausing participants 
-    to_pause <= (pause_participant * participants).pairs(:partid => :partid) { 
+    to_pause <~ (pause_participant * participants).pairs(:partid => :partid) { 
       |r, p| [p.host, ip_port, r.reqid]
     }
 
     # Unpausing participants 
-    to_unpause <= (resume_participant * participants).pairs(:partid => :partid) { 
+    to_unpause <~ (resume_participant * participants).pairs(:partid => :partid) { 
       |r, p| [p.host, ip_port, r.reqid]
     }
 
-    ack <= control_acks
-
-    # Deleting participants
-    rm.member <- (delete_participant * participants).pairs(:partid => :partid) {
-      |r, p| [p.host, p.partid] 
-    }
-    participants <- (delete_participant * participants).pairs(:partid => :partid) { |p| [p.reqid, p.partid, p.host] }
-    ack <+ delete_participant { |r| r.reqid }
-  
+    acks <= control_ack
   end
 
   bloom :broadcast do
     # Reliably broadcast commit_request to all the participants 
     vc.begin_votes <= commit_request { |r| 
-      [r.reqid, :phase_one, rm.members.length, 5] 
+      [r.reqid, :phase_one, member.length, 5] 
     }
-    rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
+    #rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
+    pipe_in <= pipe_out
   end 
 
   bloom :reply do
     # If all participants can commit, decide to commit. Else, abort.
-    vm.phase_one_acks <= rm.mcast_done # FIXME
-    commit_response <= vm.phase_one_voting_result
+    #vc.phase_one_acks <= rm.mcast_done # FIXME
+    commit_response <= vc.phase_one_voting_result
 
     # Broadcast decision to the nodes
-    rm.send_mcast <= (commit_request * commit_response)
+    #rm.send_mcast <= (commit_request * commit_response)
+    pipe_in <= pipe_out
 
-    vm.phase_two_acks <= rm.mcast_done # FIXME
+    #vc.phase_two_acks <= rm.mcast_done # FIXME
 
     # TODO: Clean up once we have received all the acks for
     # Phase 2
-    phase_two_response <= vm.phase_two_voting_result
+    phase_two_response <= vc.phase_two_voting_result
   end
 end
