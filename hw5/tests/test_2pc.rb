@@ -10,8 +10,7 @@ class Test2PC < Test::Unit::TestCase
 
     bootstrap do
       add_participant <= [[1, 1, "localhost:54320"],
-                          [2, 2, "localhost:54321"],
-                          [3, 3, "localhost:54322"]]
+                          [2, 2, "localhost:54321"]]
     end
   end
 
