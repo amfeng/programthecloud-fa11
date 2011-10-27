@@ -7,7 +7,6 @@ module TwoPCVoteCounting
     # Rows we've currently seen, and number of counts required
     table :req_table, [:reqid] => [:phase, :num, :timeout]
     table :rows, [:phase, :from, :reqid] => [:payload]
-    table :timeout, [] => [:timeout]
 
     scratch :counts, [:reqid, :phase, :payload] => [:num]
     scratch :timed_out, [:reqid]
@@ -32,8 +31,8 @@ module TwoPCVoteCounting
 
   # Save the rows that come in, so we can count them
   bloom :save_rows do
-    acks <= phase_one_acks { |p| [:phase_one] + p }
-    acks <= phase_two_acks { |p| [:phase_two] + p }
+    acks <= phase_one_acks { |p| ["phase_one"] + p }
+    acks <= phase_two_acks { |p| ["phase_two"] + p }
 
     # Discard rows that we aren't currently counting
     rows <= (acks * req_table).lefts(:reqid => :reqid, :phase => :phase)
@@ -46,20 +45,20 @@ module TwoPCVoteCounting
   bloom :phase_one do
     # Abort immediately if we get a NO
     phase_one_voting_result <=  (phase_one_acks * req_table).pairs(:reqid=> :reqid) { |a, r|
-      [r.reqid, :A] if a.payload == "no" and r.phase == :phase_one     
+      [r.reqid, :A] if a.payload == "no" and r.phase == "phase_one"     
     }
 
     # Find the reqid's that have enough :yes acks
     phase_one_voting_result <= (counts * req_table).pairs { |c, r|
       [c.reqid, :C] if (c.num == r.num and 
-                        c.phase == :phase_one and 
+                        c.phase == "phase_one" and 
                         c.payload == "yes")
     }
 
     # Abort if we time out
-    #timed_out <= req_table { |r|
-    #  [r.reqid] if (r.phase == :phase_one and r.timeout <= 0)
-    #}
+    timed_out <= req_table { |r|
+      [r.reqid] if (r.phase == "phase_one" and r.timeout <= 0)
+    }
 
     phase_one_voting_result <= timed_out { |t| [t.reqid, :A] }
     req_table <- (req_table * timed_out).lefts(:reqid => :reqid)
@@ -69,14 +68,14 @@ module TwoPCVoteCounting
   bloom :phase_two do
     phase_two_voting_result <= (counts * req_table).pairs { |c, r|
       [c.reqid, :committed] if (c.num == r.num and 
-                                c.phase == :phase_two and 
-                                c.payload == :committed)
+                                c.phase == "phase_two" and 
+                                c.payload == "committed")
     }
   end
 
   bloom :timeout_tick do
     req_table <+- (req_table * timer).lefts { |r|
-      [r.reqid, r.phase, r.num, 0]
+      [r.reqid, r.phase, r.num, r.timeout - 1]
     }
   end
 

@@ -97,7 +97,7 @@ module TwoPCCoordinator
   bloom :broadcast do
     # Initialize vote counting for this request
     vc.begin_votes <= commit_request { |r| 
-      [r.reqid, :phase_one, member.length, 5] 
+      [r.reqid, "phase_one", member.length, 5] 
     }
 
     # Reliably broadcast commit_request to all the participants 
@@ -113,6 +113,7 @@ module TwoPCCoordinator
     # Send decision to the client
     commit_response <= vc.phase_one_voting_result
 
+=begin
     # Broadcast decision to the nodes
     pipe_in <= (member * commit_response).pairs { |m, r|
       if r.status == :C
@@ -121,6 +122,7 @@ module TwoPCCoordinator
         [m.host, ip_port, r.reqid, :abort] unless m.host == ip_port
       end
     }
+=end   
 
     # TODO: Count acks from Phase 2
     # TODO: Clean up once we have received all the acks for
