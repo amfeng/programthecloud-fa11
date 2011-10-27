@@ -60,8 +60,6 @@ module TwoPCVoteCounting
       [r.reqid] if (r.phase == "phase_one" and r.timeout <= 0)
     }
 
-    stdio <~ timed_out.inspected
-    stdio <~ phase_one_voting_result.inspected
     phase_one_voting_result <= timed_out { |t| [t.reqid, :A] }
     req_table <- (req_table * timed_out).lefts(:reqid => :reqid)
   end
