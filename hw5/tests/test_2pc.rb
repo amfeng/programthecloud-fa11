@@ -32,7 +32,7 @@ class Test2PC < Test::Unit::TestCase
     # Broadcast a commit request - it should succeed
     resps = coord.sync_callback(:commit_request, [[1]], :commit_response)
     5.times { coord.sync_do }
-    #assert_equal([["C"]], resps)
+    assert_equal([[1, :C]], resps)
     
     # # Pause participant 1
     # p1.sync_callback {p1.pause_participant <+ [[6,1]]}
@@ -48,19 +48,21 @@ class Test2PC < Test::Unit::TestCase
     # resps = p1.sync_callback(:commit_request, [[9]], :commit_response)
     # assert_equal([["C"]], resps)
 
-    # Pause a participant 2
-    #p1.sync_callback {p1.pause_participant <+ [[10,2]]}
+    # Pause participant 2
+    coord.sync_do {coord.pause_participant <+ [[10,2]]}
+    5.times { coord.sync_do }
     
     # Broadcast a commit request - it should fail
-    #resps = p1.sync_callback(:commit_request, [[11]], :commit_response)
-    #assert_equal([["A"]], resps)
+    resps = coord.sync_callback(:commit_request, [[11]], :commit_response)
+    assert_equal([[11, :A]], resps)
 
     # Resume participant 2
-    #p1.sync_callback {p1.pause_participant <+ [[12,2]]}
+    coord.sync_do {coord.resume_participant <+ [[12,2]]}
+    5.times { coord.sync_do }
     
     # Broadcast a commit request - it should succeed
-    #resps = p1.sync_callback(:commit_request, [[13]], :commit_response)
-    #assert_equal([["C"]], resps)
+    resps = coord.sync_callback(:commit_request, [[13]], :commit_response)
+    assert_equal([[13, :C]], resps)
 
     #p1.stop
   end
