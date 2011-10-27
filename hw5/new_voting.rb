@@ -46,14 +46,16 @@ module TwoPCVoteCounting
   bloom :phase_one do
     # Abort immediately if we get a NO
     phase_one_voting_result <=  (phase_one_acks * req_table).pairs(:reqid=> :reqid) { |a, r|
-      [r.reqid, :A] if a.payload == :no and r.phase == :phase_one     
+      [r.reqid, :A] if a.payload == "no" and r.phase == :phase_one     
     }
+
+    stdio <~ phase_one_acks.inspected
 
     # Find the reqid's that have enough :yes acks
     phase_one_voting_result <= (counts * req_table).pairs { |c, r|
       [c.reqid, :C] if (c.num == r.num and 
                         c.phase == :phase_one and 
-                        c.payload == :yes)
+                        c.payload == "yes")
     }
 
     # Abort if we time out

@@ -49,7 +49,7 @@ module TwoPCParticipant
 
     # FIXME: Make this use ReliableDelivery instead
     #cast_vote <= active_ballot { |b| [b.ident, :yes] } 
-    pipe_in <= pipe_out { |p| [p.src, p.dst, p.ident, :yes] }
+    pipe_in <= pipe_out { |p| [p.src, p.dst, p.ident, "yes"] }
   end
 
   bloom :control do
@@ -97,9 +97,9 @@ module TwoPCCoordinator
 
   bloom :broadcast do
     # Reliably broadcast commit_request to all the participants 
-    #vc.begin_votes <= commit_request { |r| 
-    #  [r.reqid, :phase_one, member.length, 5] 
-    #}
+    vc.begin_votes <= commit_request { |r| 
+      [r.reqid, :phase_one, member.length, 5] 
+    }
     #rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
     pipe_in <= (member * commit_request).pairs { |m, r|
       [m.host, ip_port, r.reqid, :commit_request] unless m.host == ip_port
@@ -108,8 +108,9 @@ module TwoPCCoordinator
 
   bloom :reply do
     # If all participants can commit, decide to commit. Else, abort.
-    #vc.phase_one_acks <= rm.mcast_done # FIXME
-    #commit_response <= vc.phase_one_voting_result
+    vc.phase_one_acks <= pipe_out { |p| [p.src, p.ident, p.payload] }
+    commit_response <= vc.phase_one_voting_result
+    stdio <~ commit_response.inspected
 
     # Broadcast decision to the nodes
     #rm.send_mcast <= (commit_request * commit_response)

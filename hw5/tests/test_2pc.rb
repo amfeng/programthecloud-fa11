@@ -26,8 +26,8 @@ class Test2PC < Test::Unit::TestCase
     p1.run_bg
 
     # Broadcast a commit request - it should succeed
-    coord.sync_do { coord.commit_request <+ [[1]] }
-    resps = coord.sync_callback(:commit_request, [[5]], :pipe_in)
+    resps = coord.sync_callback(:commit_request, [[1]], :commit_response)
+    5.times { coord.sync_do }
     #assert_equal([["C"]], resps)
     
     # # Pause participant 1
