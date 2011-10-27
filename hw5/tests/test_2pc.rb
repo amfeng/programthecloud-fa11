@@ -9,7 +9,7 @@ class Test2PC < Test::Unit::TestCase
     include TwoPCCoordinator
 
     bootstrap do
-      add_participant <= [[1, 1, 'localhost:54320']]
+      add_participant <= [[1, 1, "localhost:54320"]]
     end
   end
 
@@ -27,6 +27,7 @@ class Test2PC < Test::Unit::TestCase
 
     # Broadcast a commit request - it should succeed
     coord.sync_do { coord.commit_request <+ [[1]] }
+    puts p1.pipe_out.inspected
     #resps = coord.sync_callback(:commit_request, [[5]], :pipe_out)
     #assert_equal([["C"]], resps)
     

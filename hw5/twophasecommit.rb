@@ -50,7 +50,7 @@ module TwoPCParticipant
     # FIXME: Make this use ReliableDelivery instead
     #cast_vote <= active_ballot { |b| [b.ident, :yes] } 
     stdio <~ pipe_out.inspected
-    pipe_in <= pipe_out { |p| [p.src, p.dest, p.ident, :yes] }
+    pipe_in <= pipe_out { |p| [p.src, p.dst, p.ident, :yes] }
   end
 
   bloom :control do
@@ -102,7 +102,6 @@ module TwoPCCoordinator
     #  [r.reqid, :phase_one, member.length, 5] 
     #}
     #rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
-    stdio <~ pipe_in.inspected
     pipe_in <= (member * commit_request).pairs { |m, r|
       [m.host, ip_port, r.reqid, :commit_request] unless m.host == ip_port
     }
