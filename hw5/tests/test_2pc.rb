@@ -33,20 +33,6 @@ class Test2PC < Test::Unit::TestCase
     5.times { coord.sync_do }
     assert_equal([[1, :C]], resps)
     
-    # # Pause participant 1
-    # coord.sync_do {coord.pause_participant <+ [[6,1]]}
-    
-    # # Broadcast a commit request - it should fail
-    # resps = coord.sync_callback(:commit_request, [[7]], :commit_response)
-    # assert_equal([[7, :A]], resps)
-
-    # # Delete participant 1 now
-    # coord.sync_do {coord.delete_participant <+ [[8,1]]}
-
-    # # Broadcast a commit request - it should succeed
-    # resps = coord.sync_callback(:commit_request, [[9]], :commit_response)
-    # assert_equal([[9, :C]], resps)
-
     # Pause participant 2
     coord.sync_do {coord.pause_participant <+ [[10,2]]}
     5.times { coord.sync_do }
