@@ -36,7 +36,6 @@ module TwoPCParticipant
 
   state do
     table :active, [] => [:active]
-    table :active_ballot, ballot.schema
   end
 
   bootstrap do
@@ -50,15 +49,16 @@ module TwoPCParticipant
 
     # FIXME: Make this use ReliableDelivery instead
     #cast_vote <= active_ballot { |b| [b.ident, :yes] } 
-    pipe_in <= pipe_out 
+    stdio <~ pipe_out.inspected
+    pipe_in <= pipe_out { |p| [p.src, p.dest, p.ident, :yes] }
   end
 
   bloom :control do
     active <- to_pause { |p| [:true] }
     active <+ to_unpause { |p| [:true] }
 
-    control_ack <+ to_pause { |p| [p.from, p.to, p.reqid] }
-    control_ack <+ to_unpause { |p| [p.from, p.to, p.reqid] }
+    control_ack <~ to_pause { |p| [p.from, p.to, p.reqid] }
+    control_ack <~ to_unpause { |p| [p.from, p.to, p.reqid] }
   end
 end
 
@@ -98,26 +98,29 @@ module TwoPCCoordinator
 
   bloom :broadcast do
     # Reliably broadcast commit_request to all the participants 
-    vc.begin_votes <= commit_request { |r| 
-      [r.reqid, :phase_one, member.length, 5] 
-    }
+    #vc.begin_votes <= commit_request { |r| 
+    #  [r.reqid, :phase_one, member.length, 5] 
+    #}
     #rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
-    pipe_in <= pipe_out
+    stdio <~ pipe_in.inspected
+    pipe_in <= (member * commit_request).pairs { |m, r|
+      [m.host, ip_port, r.reqid, :commit_request] unless m.host == ip_port
+    }
   end 
 
   bloom :reply do
     # If all participants can commit, decide to commit. Else, abort.
     #vc.phase_one_acks <= rm.mcast_done # FIXME
-    commit_response <= vc.phase_one_voting_result
+    #commit_response <= vc.phase_one_voting_result
 
     # Broadcast decision to the nodes
     #rm.send_mcast <= (commit_request * commit_response)
-    pipe_in <= pipe_out
+    #pipe_in <= pipe_out
 
     #vc.phase_two_acks <= rm.mcast_done # FIXME
 
     # TODO: Clean up once we have received all the acks for
     # Phase 2
-    phase_two_response <= vc.phase_two_voting_result
+    #phase_two_response <= vc.phase_two_voting_result
   end
 end
