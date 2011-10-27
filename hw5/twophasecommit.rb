@@ -14,11 +14,11 @@ end
 
 module AgreementConfigProtocol
   state do
-    interface input :add_participant, [:reqid, :partid] => [:host]
-    interface input :delete_participant, [:reqid, :partid]
-    interface input :pause_participant, [:reqid, :partid]
-    interface input :resume_participant, [:reqid, :partid]
-    interface output :ack, [:reqid]
+    interface input, :add_participant, [:reqid, :partid] => [:host]
+    interface input, :delete_participant, [:reqid, :partid]
+    interface input, :pause_participant, [:reqid, :partid]
+    interface input, :resume_participant, [:reqid, :partid]
+    interface output, :ack, [:reqid]
   end
 end
 

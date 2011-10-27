@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'test/unit'
-require '../quorum_kvs'
+require 'twophasecommit'
 
 class TestQuorum < Test::Unit::TestCase
   class TwoPCTest
