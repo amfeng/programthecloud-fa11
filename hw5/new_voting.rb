@@ -34,16 +34,12 @@ module TwoPCVoteCounting
     acks <= phase_one_acks { |p| ["phase_one"] + p }
     acks <= phase_two_acks { |p| ["phase_two"] + p }
 
-    stdio <~ acks.inspected
-
     # Discard rows that we aren't currently counting
     rows <= (acks * req_table).lefts(:reqid => :reqid, :phase => :phase)
-    stdio <~ rows.inspected
   end
 
   bloom :count do
     counts <= rows.group([:reqid, :phase, :payload], count()) 
-    stdio <~ counts.inspected
   end
 
   bloom :phase_one do
@@ -63,8 +59,6 @@ module TwoPCVoteCounting
     timed_out <= req_table { |r|
       [r.reqid] if (r.phase == "phase_one" and r.timeout <= 0)
     }
-
-    stdio <~ timed_out.inspected
 
     phase_one_voting_result <= timed_out { |t| [t.reqid, :A] }
     req_table <- (req_table * timed_out).lefts(:reqid => :reqid)
