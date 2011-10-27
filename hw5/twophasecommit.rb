@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'voting/voting'
-require 'delivery/multicast'
+require 'delivery/reliable_delivery'
 require 'membership/membership'
 require 'new_voting'
 
@@ -13,6 +13,8 @@ module TwoPCCoordinatorProtocol
 end
 
 module AgreementConfigProtocol
+  import ReliableDelivery => :rd
+
   state do
     interface input, :add_participant, [:reqid, :partid] => [:host]
     interface input, :delete_participant, [:reqid, :partid]
@@ -24,8 +26,8 @@ end
 
 module ParticipantControlProtocol
   state do
-    channel :pause, [:@to, :from, :reqid]
-    channel :unpause, [:@to, :from, :reqid]
+    channel :to_pause, [:@to, :from, :reqid]
+    channel :to_unpause, [:@to, :from, :reqid]
     channel :control_ack, [:@to, :from, :reqid]
   end
 end
@@ -53,11 +55,11 @@ module TwoPCParticipant
   end
 
   bloom :control do
-    active <- pause { |p| [:true] }
-    active <+ unpause { |p| [:true] }
+    active <- to_pause { |p| [:true] }
+    active <+ to_unpause { |p| [:true] }
 
-    control_ack <+ pause { |p| [p.from, p.to, p.reqid] }
-    control_ack <+ unpause { |p| [p.from, p.to, p.reqid] }
+    control_ack <+ to_pause { |p| [p.from, p.to, p.reqid] }
+    control_ack <+ to_unpause { |p| [p.from, p.to, p.reqid] }
   end
 end
 
@@ -65,15 +67,15 @@ module TwoPCCoordinator
   include TwoPCCoordinatorProtocol
   include AgreementConfigProtocol
   include ParticipantControlProtocol
+  include StaticMembership
   import TwoPCVoteCounting => :vc
-  import ReliableMulticast => :rm
 
   state do
     # Keep track of ident -> host, since members table holds the 
     # reverse only
     table :participants, [:reqid, :partid] => [:host]
-    scratch :phase_one_response, result.schema
-    scratch :phase_two_response, result.schema
+    scratch :phase_one_response, [:reqid] => [:value]
+    scratch :phase_two_response, [:reqid] => [:value]
   end
 
   bloom :participant_control do
@@ -83,12 +85,12 @@ module TwoPCCoordinator
     ack <+ add_participant { |r| r.reqid }
 
     # Pausing participants 
-    pause <= (pause_participant * participants).pairs(:partid => :partid) { 
+    to_pause <= (pause_participant * participants).pairs(:partid => :partid) { 
       |r, p| [p.host, ip_port, r.reqid]
     }
 
     # Unpausing participants 
-    unpause <= (resume_participant * participants).pairs(:partid => :partid) { 
+    to_unpause <= (resume_participant * participants).pairs(:partid => :partid) { 
       |r, p| [p.host, ip_port, r.reqid]
     }
 
@@ -101,10 +103,6 @@ module TwoPCCoordinator
     participants <- (delete_participant * participants).pairs(:partid => :partid) { |p| [p.reqid, p.partid, p.host] }
     ack <+ delete_participant { |r| r.reqid }
   
-  end
-
-  bloom :done_mcast do
-    rm.mcast_done <= pipe_sent {|p| [p.dst, p.ident, p.payload] }
   end
 
   bloom :broadcast do
