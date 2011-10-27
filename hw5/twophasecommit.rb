@@ -83,22 +83,24 @@ module TwoPCCoordinator
     ack <+ add_participant { |r| r.reqid }
 
     # Pausing participants 
-    pause <= (pause_participant * participants).pairs(:partid => :partid) { |r, p|
-      [p.host, ip_port, r.reqid]
+    pause <= (pause_participant * participants).pairs(:partid => :partid) { 
+      |r, p| [p.host, ip_port, r.reqid]
     }
 
     # Unpausing participants 
-    unpause <= (resume_participant * participants).pairs(:partid => :partid) { |r, p|
-      [p.host, ip_port, r.reqid]
+    unpause <= (resume_participant * participants).pairs(:partid => :partid) { 
+      |r, p| [p.host, ip_port, r.reqid]
     }
 
     ack <= control_acks
 
     # Deleting participants
-    rm.member <- (delete_participant * participants).pairs(:partid => :partid) { |r, p| [p.host, p.partid] }
-    participants <- (delete_participant * participants).paird(:partid => :partid) { |p| [p.reqid, p.partid, p.host] }
+    rm.member <- (delete_participant * participants).pairs(:partid => :partid) {
+      |r, p| [p.host, p.partid] 
+    }
+    participants <- (delete_participant * participants).pairs(:partid => :partid) { |p| [p.reqid, p.partid, p.host] }
     ack <+ delete_participant { |r| r.reqid }
-    
+  
   end
 
   bloom :done_mcast do
@@ -107,20 +109,24 @@ module TwoPCCoordinator
 
   bloom :broadcast do
     # Reliably broadcast commit_request to all the participants 
-    vc.begin_votes <= commit_request { |r| [r.reqid, :phase_one, rm.members.length, 5] }
+    vc.begin_votes <= commit_request { |r| 
+      [r.reqid, :phase_one, rm.members.length, 5] 
+    }
     rm.send_mcast <= commit_request { |r| [r.reqid, :commit_request] }
   end 
 
   bloom :reply do
     # If all participants can commit, decide to commit. Else, abort.
     vm.phase_one_acks <= rm.mcast_done # FIXME
-    commit_response <= vm.phase_two_voting_result
+    commit_response <= vm.phase_one_voting_result
 
-    # TODO: Broadcast decision to the nodes
+    # Broadcast decision to the nodes
+    rm.send_mcast <= (commit_request * commit_response)
+
     vm.phase_two_acks <= rm.mcast_done # FIXME
 
     # TODO: Clean up once we have received all the acks for
     # Phase 2
-    phase_two_response <= phase_two_voting_result
+    phase_two_response <= vm.phase_two_voting_result
   end
 end

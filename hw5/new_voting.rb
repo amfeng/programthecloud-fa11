@@ -16,7 +16,7 @@ module TwoPCVoteCounting
     interface input, :phase_one_acks, [:from, :reqid] => [:payload]
     interface input, :phase_two_acks, [:from, :reqid] => [:payload]
 
-    interface input, :begin_votes, [:reqid] => [:num]
+    interface input, :begin_votes, [:reqid] => [:phase, :num, :timeout]
 
     # TODO: Generalize into one output channel
     interface output, :phase_one_voting_result, [:reqid] => [:value]
@@ -52,8 +52,8 @@ module TwoPCVoteCounting
     # Find the reqid's that have enough :yes acks
     phase_one_voting_result <= (counts * num_required).pairs { |c, r|
       [c.reqid, :C] if (c.num == r.num and 
-                                        c.phase == :phase_one and 
-                                        c.payload == :yes)
+                        c.phase == :phase_one and 
+                        c.payload == :yes)
     }
 
     # Abort if we time out
@@ -69,8 +69,8 @@ module TwoPCVoteCounting
   bloom :phase_two do
     phase_two_voting_result <= (counts * num_required).pairs { |c, r|
       [c.reqid, :committed] if (c.num == r.num and 
-                                        c.phase == :phase_two and 
-                                        c.payload == :committed)
+                                c.phase == :phase_two and 
+                                c.payload == :committed)
     }
   end
 
