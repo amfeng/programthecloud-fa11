@@ -16,7 +16,7 @@ module VoteCounterProtocol
 
     # Returns the result of the vote once
     # @param [Object] ballot_id the unique id of the ballot
-    # @param [Symbol] status status of the vote, :success, :fail
+    # @param [Symbol] status status of the vote, :success, :fail, :error
     # @param [Object] result outcome of the vote, contents depend on :vote field of cast_vote input
     # @param [Array] votes an aggregate of all of the votes cast
     # @param [Array] notes an aggregte of all of the notes send
