@@ -10,13 +10,13 @@ module VoteCounterProtocol
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] num_votes the number of votes that will be cast
     # (this number will remain static throughout the vote)
-    interface input :begin_vote, [:ballot_id] => [:num_votes]
+    interface input, :begin_vote, [:ballot_id] => [:num_votes]
 
     # On the client side, send votes to be counted
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Object] vote specific vote
     # @param [String] note any extra information to provide along with the vote
-    interface input :cast_vote, [:ballot_id, :vote, :note]
+    interface input, :cast_vote, [:ballot_id, :vote, :note]
 
     # Returns the result of the vote once
     # @param [Object] ballot_id the unique id of the ballot
@@ -41,7 +41,7 @@ module RatioVoteCounter
     # This ratio must be set before the vote starts.
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] ratio floating point number for the percentage of votes needed to "win"
-    interface input :ratio, [:ballot_id] => [:ratio]
+    interface input, :ratio, [:ballot_id] => [:ratio]
 
     # Table to hold the set of active ballots. 
     # TODO?: Include status of the ballot, either 'in progress' or the result if completed.
@@ -60,13 +60,13 @@ module RatioVoteCounter
 
     # Scratch to hold summary data for a ballot, including total number
     # of votes cast, an array of those votes, and an array of notes.
-    scratch :vote_summary, [:ballot_id] => [:count, :votes, :notes]
+    scratch :vote_summary, [:ballot_id] => [:cnt, :votes, :notes]
 
     # Scratch to hold number of votes cast for each vote/response for a ballot.
-    scratch :grouped_vote_counts, [:ballot_id, :vote, :count]
+    scratch :grouped_vote_counts, [:ballot_id, :vote, :cnt]
 
     # Scratch to hold completed ballot_ids and accumulated data.
-    scratch :completed_ballots, [:ballot_id, :votes, :notes]
+    scratch :completed_ballots, [:ballot_id, :num_votes, :votes, :notes]
 
     # Scratch to hold the number of votes needed for a winner for a ballot.
     scratch :votes_needed, [:ballot_id] => [:num_votes]
@@ -76,28 +76,32 @@ module RatioVoteCounter
     # if ratio is set improperly such that there can be multiple winners. This
     # constraint stems from the fact that the output interface result has [:ballot_id]
     # as its key, indicating at most one winner per ballot_id.
-    scratch :winning_vote [:ballot_id] => [:vote]
+    scratch :winning_vote, [:ballot_id] => [:vote]
     # TODO?: We could consider supporting multiple winners by grouping them
     # together in the :result column, but I would not suggest it.
+  end
+
+  
+  bloom :debug do
+    stdio <~ ongoing_ballots {|i| ["At #{budtime}, ongoing_ballots has #{i.inspect}"]}
+    stdio <~ ballot_ratios {|i| ["At #{budtime}, ballot_ratios has #{i.inspect}"]}
+    stdio <~ votes_rcvd {|i| ["At #{budtime}, votes_rcvd has #{i.inspect}"]}
+    
+    stdio <~ completed_ballots {|i| ["At #{budtime}, completed_ballots has #{i.inspect}"]}
+    stdio <~ winning_vote {|i| ["At #{budtime}, winning_vote has #{i.inspect}"]}
   end
 
 
   # Add a ballot to :ongoing_ballots when it appears in :begin_vote
   # if the associated ballot_id does not already exist in :ongoing_ballots.
   bloom :add_ballot do 
-    temp :ongoing_ballot_ids <= ongoing_ballots {|ob| [ob.ballot_id] }
-    ongoing_ballots <= begin_vote do |bv|
-      bv unless ongoing_ballot_ids.include?([bv.ballot_id])
-    end
+    ongoing_ballots <+ begin_vote.notin(ongoing_ballots, :ballot_id => :ballot_id)
   end
 
   # Add a ratio to :ballot_ratios when it appears in :ratio
   # if the associated :ballot_id does not already exist in :ballot_ratios.
   bloom :add_ballot_ratio do
-    temp :existing_ratio_ids <= ballot_ratios {|br| [br.ballot_id] }
-    ballot_ratios <= ratio do |r|
-      r unless existing_ratio_ids.include?([r.ballot_id])
-    end
+    ballot_ratios <+ ratio.notin(ballot_ratios, :ballot_id => :ballot_id)
   end
 
   # Accumulate votes (and associated notes) as they appear on :cast_vote.
@@ -120,8 +124,8 @@ module RatioVoteCounter
   bloom :process_data do
     # Put a ballot's data into completed_ballots if the count in vote_summary equals
     # num_votes in ongoing_ballots for that ballot.
-    completed_ballots <= (vote_summary * ongoing_ballots).pairs(:ballot_id => :ballot_id, :count => :num_votes) do |s, b|
-      [b.ballot_id, s.votes, s.notes]
+    completed_ballots <= (vote_summary * ongoing_ballots).pairs(:ballot_id => :ballot_id, :cnt => :num_votes) do |s, b|
+      [b.ballot_id, b.num_votes, s.votes, s.notes]
     end
     
     # Process completed ballots to determine a winner (success) or not (failure).
@@ -135,7 +139,7 @@ module RatioVoteCounter
     # along with the result. If there is not, indicate failure with a nil result.
     winning_vote <= (votes_needed * grouped_vote_counts).pairs(:ballot_id => :ballot_id) do |vn, gc|
       # Return a winning result if we have one.
-      if gc.count >= vn.num_votes
+      if gc.cnt >= vn.num_votes
         [gc.ballot_id, gc.vote]
       end
     end
@@ -143,7 +147,7 @@ module RatioVoteCounter
     # Step 3: Put the proper results onto output interface result for completed ballots.
     # There is a winner for a completed ballot if there is a winning_vote entry with a
     # matching ballot_id. If there is no winning_vote entry, then there is was no winner.
-    result <= (completed_ballots * winning_vote).pairs do |b, v|
+    result <= (completed_ballots * winning_vote).outer do |b, v|
       if b.ballot_id == v.ballot_id
         [b.ballot_id, :success, v.vote, b.votes, b.notes]
       else
