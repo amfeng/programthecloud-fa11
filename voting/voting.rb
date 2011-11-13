@@ -125,19 +125,21 @@ module RatioVoteCounter
   end
 end
 
-# UnanimousVoteCounter is a specific case of RatioVoteCounter, where the ratio is 1.
+# UnanimousVoteCounter is a specific case of RatioVoteCounter, where the 
+# ratio is 1.
 # @see UnanimousVoteCounter extends RatioVoteCounter
 module UnanimousVoteCounter
   include RatioVoteCounter
 end
 
-# MajorityVoteCounter is an implementation of the VoteCounterProtocol, where the number of votes needed for a majority is floor(ratio * num_members) + 1
+# MajorityVoteCounter is an implementation of the VoteCounterProtocol, where 
+# the number of votes needed for a majority is floor(ratio * num_members) + 1
 # @see MajorityVoteCounter implements VoteCounterProtocol
 module MajorityVoteCounter
   include VoteCounterProtocol
 end
 
-# UniqueVoteCounter is a module that can be composed with a VoteCounterProtocol
+# SingleVoteCounter is a module that can be composed with a VoteCounterProtocol
 # implementation to only allow a single vote from each voting agent (determined
 # by uniqueness of the ip_port field)
 module SingleVoteCounter 
