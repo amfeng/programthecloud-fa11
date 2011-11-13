@@ -101,7 +101,7 @@ module CountVoteCounter
     extra <= vote.group([:ballot_id], accum(:candidate), accum(:note))
     stdio <~ extra.inspected
     result <= (enough * extra).pairs(:ballot_id => :ballot_id) { |w, e|
-      [w.ballot_id, :success, w.vote, extra.votes, extra.notes]
+      [w.ballot_id, :success, w.vote, e.votes, e.notes]
     }
     stdio <~ result.inspected
   end
