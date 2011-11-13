@@ -137,6 +137,9 @@ module MajorityVoteCounter
   include VoteCounterProtocol
 end
 
-module UniqueVoteCounter
+# UniqueVoteCounter is a module that can be composed with a VoteCounterProtocol
+# implementation to only allow a single vote from each voting agent (determined
+# by uniqueness of the ip_port field)
+module SingleVoteCounter 
 end
 
