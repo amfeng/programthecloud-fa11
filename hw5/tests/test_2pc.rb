@@ -49,6 +49,5 @@ class Test2PC < Test::Unit::TestCase
     resps = coord.sync_callback(:commit_request, [[13]], :commit_response)
     assert_equal([[13, :C]], resps)
 
-    #p1.stop
   end
 end

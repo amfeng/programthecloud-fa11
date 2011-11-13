@@ -75,8 +75,8 @@ module CountVoteCounter
     # the VoteCounterProtocol, and that one that passes in the number of
     # required votes for a "winning" candidate), we need two tables
     preballot <= begin_vote
-    ballot <= (preballot * required_votes).pairs(:ballot_id => :ballot_id) { |p, r|
-      [p.ballot_id, p.num_votes, r.num_required]     
+    ballot <= (preballot * required_votes).pairs(:ballot_id => :ballot_id) { 
+      |p, r| [p.ballot_id, p.num_votes, r.num_required]     
     }
   end
 
