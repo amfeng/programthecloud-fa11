@@ -7,13 +7,13 @@ module VoteCounterProtocol
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] num_votes the number of votes that will be cast 
     # (this number will remain static throughout the vote)
-    interface input :begin_vote, [:ballot_id] => [:num_votes]
+    interface input, :begin_vote, [:ballot_id] => [:num_votes]
 
     # On the client side, send votes to be counted
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Object] candidate specific candidate we're voting for
     # @param [String] note any extra information to provide along with the vote
-    interface input :cast_vote, [:ballot_id, :candidate, :note]
+    interface input, :cast_vote, [:ballot_id, :candidate, :note]
 
     # Returns the result of the vote once
     # @param [Object] ballot_id the unique id of the ballot
@@ -40,7 +40,7 @@ module CountVoteCounter
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] num_required the number of votes required for a 
     # winning vote (ex. unanimous = number of total votes)
-    interface input :required_votes, [:ballot_id] => [:num_required]  
+    interface input, :required_votes, [:ballot_id] => [:num_required]  
 
     # ===Private State===
 
@@ -115,7 +115,7 @@ module RatioVoteCounter
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] ratio floating point number for the percentage of votes 
     # needed for a candidate to "win"
-    interface input :ratio, [:ballot_id] => [:ratio]
+    interface input, :ratio, [:ballot_id] => [:ratio]
   end
 
   bloom :delegate do
