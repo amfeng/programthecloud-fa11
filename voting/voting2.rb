@@ -108,6 +108,7 @@ module RatioVoteCounter
 
   # Add a ratio to :ballot_ratios when it appears in :ratio
   # if the associated :ballot_id does not already exist in :ballot_ratios.
+  # This method should be overwritten by subclasses.
   bloom :add_ballot_ratio do
     ballot_ratios <+ ratio.notin(ballot_ratios, :ballot_id => :ballot_id)
   end
@@ -117,6 +118,8 @@ module RatioVoteCounter
   # be handled before a vote is put onto :cast_vote.
   bloom :gather_votes do
     # Store incoming votes in votes_rcvd table.
+    # BIG TODO: change votes_rcvd so you can have multiple votes with same :vote,:note
+    # possibly with an extra field like the count.
     votes_rcvd <= cast_vote
     
     # Additional processing for usage in :process_data.
@@ -183,6 +186,14 @@ end
 # @see UnanimousVoteCounter extends RatioVoteCounter
 module UnanimousVoteCounter
   include RatioVoteCounter
+
+  # Bypass the :ratio interface completely and insert [:ballotid, 1] into
+  # ballot_ratios whenever a new ballot is put onto begin_vote. No need to check
+  # if ballot_id already exists in ballot_ratios because ratio = 1 regardless.
+  # @override
+  bloom :add_ballot_ratio do
+    ballot_ratios <+ begin_vote {|bv| [bv.ballot_id, 1]}
+  end
 end
 
 # MajorityVoteCounter is an implementation of the VoteCounterProtocol,
