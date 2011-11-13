@@ -96,6 +96,7 @@ module RatioVoteCounter
     
     stdio <~ completed_ballots {|i| ["At #{budtime}, completed_ballots has #{i.inspect}"]}
     stdio <~ winning_vote {|i| ["At #{budtime}, winning_vote has #{i.inspect}"]}
+    stdio <~ votes_needed {|i| ["At #{budtime}, votes_needed has #{i.inspect}"]}
   end
 
 
@@ -187,9 +188,10 @@ end
 module UnanimousVoteCounter
   include RatioVoteCounter
 
-  # Bypass the :ratio interface completely and insert [:ballotid, 1] into
-  # ballot_ratios whenever a new ballot is put onto begin_vote. No need to check
-  # if ballot_id already exists in ballot_ratios because ratio = 1 regardless.
+  # Bypass the :ratio interface completely and insert [:ballotid, 1]
+  # into ballot_ratios whenever a new ballot is put onto
+  # begin_vote. No need to check if ballot_id already exists in
+  # ballot_ratios because ratio = 1 regardless.
   # @override
   bloom :add_ballot_ratio do
     ballot_ratios <+ begin_vote {|bv| [bv.ballot_id, 1]}
@@ -203,6 +205,15 @@ end
 module MajorityVoteCounter
   include RatioVoteCounter
 
-  # So where Ratio says votes_needed = whatever,
-  # We override that method here and make it votes_needed = majority #
+  # Bypass the :ratio interface completely and insert [:ballotid, floor(0.5*num_members)+1]
+  # into ballot_ratios whenever a new ballot is put onto begin_vote. No need
+  # to check if ballot_id already exists in ballot_ratios because
+  # ratio = the majority number always.
+  # @override
+  bloom :add_ballot_ratio do
+    ballot_ratios <+ begin_vote {|bv| [bv.ballot_id, 0.51]}
+  end
+  
+  # _TODO_Verify: Can I just implement majority as a ratio of ceil(0.51*num_members) or something.
+  # It would be so much more convenient!
 end
