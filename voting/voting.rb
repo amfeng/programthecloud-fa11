@@ -84,6 +84,7 @@ module CountVoteCounter
 
   bloom :save_votes do
     vote <= cast_vote
+    stdio <~ vote.inspected
   end
 
   bloom :count_votes do
@@ -98,9 +99,11 @@ module CountVoteCounter
     
     # Add extra votes/notes data into the result
     extra <= vote.group([:ballot_id], accum(:candidate), accum(:note))
+    stdio <~ extra.inspected
     result <= (enough * extra).pairs(:ballot_id => :ballot_id) { |w, e|
       [w.ballot_id, :success, w.vote, extra.votes, extra.notes]
     }
+    stdio <~ result.inspected
   end
 end
 

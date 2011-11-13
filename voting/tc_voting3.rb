@@ -24,7 +24,7 @@ class TestVoting < Test::Unit::TestCase
     assert_equal(1, resps.first[0])
     assert_equal(:success, resps.first[1])
     assert_equal('Obama', resps.first[2])
-    assert_equal(['Obama'], resps.first[3])
+    assert_equal(['Obama', 'Obama'], resps.first[3])
     # assert_equal(true, resps.first[4].include?('second'))
     assert_equal(true, resps.first[4].include?('first'))
     p1.stop
