@@ -12,7 +12,8 @@ module VoteCounterProtocol
     # On the client side, send votes to be counted
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Object] candidate specific candidate we're voting for
-    # @param [String] note any extra information to provide along with the vote
+    # @param [String] note any extra information to provide along 
+    # with the vote
     interface input, :cast_vote, [:ballot_id, :candidate, :note]
 
     # Returns the result of the vote once
@@ -23,7 +24,8 @@ module VoteCounterProtocol
     # @param [Array] candidates an aggregate of candidates of all of the 
     # votes cast
     # @param [Array] notes an aggregte of all of the notes send
-    interface output, :result, [:ballot_id] => [:status, :result, :candidates, :notes]
+    interface output, :result, [:ballot_id] => [:status, :result, 
+                                                :candidates, :notes]
   end
 end
 
@@ -75,7 +77,7 @@ module CountVoteCounter
     # the VoteCounterProtocol, and that one that passes in the number of
     # required votes for a "winning" candidate), we need two tables
     preballot <= begin_vote
-    ballot <= (preballot * required_votes).pairs(:ballot_id => :ballot_id) { 
+    ballot <= (preballot * required_votes).pairs(:ballot_id => :ballot_id) {
       |p, r| [p.ballot_id, p.num_votes, r.num_required]     
     }
   end
@@ -86,16 +88,16 @@ module CountVoteCounter
 
   bloom :count_votes do
     # Count all of the votes for each ballot
-    counts <= vote.group([:ballot_id, :vote], count()) 
+    counts <= vote.group([:ballot_id, :candidate], count()) 
 
     # Find the ballots that have vote counts >= the ballot's required number
     # of votes for a "winning" candidate 
     enough <= (counts * ballot).pairs(:ballot_id => :ballot_id) { |c, b|
-      [c.ballot_id, c.vote] if c.num >= b.num_required
+      [c.ballot_id, c.candidate] if c.num >= b.num_required
     } 
     
     # Add extra votes/notes data into the result
-    extra <= vote.group([:ballot_id], accum(:vote), accum(:note))
+    extra <= vote.group([:ballot_id], accum(:candidate), accum(:note))
     result <= (enough * extra).pairs(:ballot_id => :ballot_id) { |w, e|
       [w.ballot_id, :success, w.vote, extra.votes, extra.notes]
     }
@@ -103,8 +105,8 @@ module CountVoteCounter
 end
 
 # RatioVoteCounter is an implementation of the VoteCounterProtocol in which
-# a floating point ratio is provided to specify what ratio of the total number
-# of votes is needed for a "winning" candidate. Note: the calculation is 
+# a floating point ratio is provided to specify what ratio of the total 
+# no of votes is needed for a "winning" candidate. Note: the calculation is 
 # rounded up, ex. votes_needed = ceil((ratio) * num_votes).
 # @see RatioVoteCounter implements VoteCounterProtocol
 module RatioVoteCounter
@@ -113,14 +115,14 @@ module RatioVoteCounter
     # On the client side, tell the vote counter what ratio to set. This 
     # ratio must be set before the vote starts.
     # @param [Object] ballot_id the unique id of the ballot
-    # @param [Number] ratio floating point number for the percentage of votes 
-    # needed for a candidate to "win"
+    # @param [Number] ratio floating point number for the percentage of 
+    # votes needed for a candidate to "win"
     interface input, :ratio, [:ballot_id] => [:ratio]
   end
 
   bloom :delegate do
-    required_votes <= (ratio * ballot).pairs(:ballot_id => :ballot_id) { |r, b| 
-      [r.ballot_id, r.ratio * b.num_votes]
+    required_votes <= (ratio * ballot).pairs(:ballot_id => :ballot_id) { 
+      |r, b| [r.ballot_id, r.ratio * b.num_votes]
     }
   end
 end
@@ -132,16 +134,16 @@ module UnanimousVoteCounter
   include RatioVoteCounter
 end
 
-# MajorityVoteCounter is an implementation of the VoteCounterProtocol, where 
-# the number of votes needed for a majority is floor(ratio * num_members) + 1
+# MajorityVoteCounter is an implementation of the VoteCounterProtocol, where
+# the no of votes needed for a majority is floor(ratio * num_members) + 1
 # @see MajorityVoteCounter implements VoteCounterProtocol
 module MajorityVoteCounter
   include VoteCounterProtocol
 end
 
-# SingleVoteCounter is a module that can be composed with a VoteCounterProtocol
-# implementation to only allow a single vote from each voting agent (determined
-# by uniqueness of the ip_port field)
+# SingleVoteCounter is a module that can be composed with a 
+# VoteCounterProtocol implementation to only allow a single vote from 
+# each voting agent (determined by uniqueness of the ip_port field)
 module SingleVoteCounter 
 end
 
