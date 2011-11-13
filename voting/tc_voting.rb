@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'test/unit'
-require 'voting'
+require 'voting2'
 
 class TestVoting < Test::Unit::TestCase
   class VotingBloom
@@ -16,7 +16,6 @@ class TestVoting < Test::Unit::TestCase
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
     p1.sync_do {p1.ratio <+ [[1, 1]]}
     p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'first']]}
-    #p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'second']]}
     
     resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'Obama', 'second']], 
                              p1.result.tabname)

@@ -42,6 +42,8 @@ module CountVoteCounter
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] num_required the number of votes required for a 
     # winning vote (ex. unanimous = number of total votes)
+
+    # interface input, :required_votes, [:ballot_id] => [:num_required]  
     interface input, :required_votes, [:ballot_id] => [:num_required]  
 
     # ===Private State===
@@ -70,6 +72,7 @@ module CountVoteCounter
     # votes to make them "winning" candidates
     scratch :enough, [:ballot_id, :vote]
     scratch :extra, [:ballot_id] => [:votes, :notes]
+
   end
 
   bloom :start do
@@ -93,6 +96,8 @@ module CountVoteCounter
 
     # Find the ballots that have vote counts >= the ballot's required number
     # of votes for a "winning" candidate 
+    stdio <~ counts.inspected
+    stdio <~ ballot.inspected
     enough <= (counts * ballot).pairs(:ballot_id => :ballot_id) { |c, b|
       [c.ballot_id, c.candidate] if c.num >= b.num_required
     } 
@@ -123,8 +128,13 @@ module RatioVoteCounter
     interface input, :ratio, [:ballot_id] => [:ratio]
   end
 
+  # bloom :delegate do
+  #   required_votes <= (ratio * ballot).pairs(:ballot_id => :ballot_id) { 
+  #     |r, b| [r.ballot_id, r.ratio * b.num_votes]
+  #   }
+  # end
   bloom :delegate do
-    required_votes <= (ratio * ballot).pairs(:ballot_id => :ballot_id) { 
+    required_votes <= (ratio * preballot).pairs(:ballot_id => :ballot_id) { 
       |r, b| [r.ballot_id, r.ratio * b.num_votes]
     }
   end
