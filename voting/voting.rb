@@ -12,9 +12,10 @@ module VoteCounterProtocol
     # On the client side, send votes to be counted
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Object] candidate specific candidate we're voting for
+    # @param [Object] agent identifying features of the agent who cast the vote
     # @param [String] note any extra information to provide along 
     # with the vote
-    interface input, :cast_vote, [:ballot_id, :candidate, :note]
+    interface input, :cast_vote, [:ballot_id, :agent, :candidate, :note]
 
     # Returns the result of the vote once
     # @param [Object] ballot_id the unique id of the ballot
@@ -112,6 +113,7 @@ module CountVoteCounter
   bloom :count_votes do
     # For each ballot, count all of the votes given to each candidate
     counts <= vote.group([:ballot_id, :candidate], count()) 
+    stdio <~ counts.inspected
     # For each ballot, count the total number of votes cast
     counts2 <= vote.group([:ballot_id], count()) 
     # For each ballot, store the total number of votes that will be cast
