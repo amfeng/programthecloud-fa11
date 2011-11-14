@@ -50,7 +50,18 @@ class TestVoting < Test::Unit::TestCase
     resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'Obama', 'third']], 
                              p1.result.tabname)
     basic_checks(2, :success, 'Obama', resps)
-    
+
+    # FIXME: This test fails!!
+    # Test success given a ratio of 0.75
+    # p1.sync_do {p1.begin_vote <+ [[3, 4]]}
+    # p1.sync_do {p1.ratio <+ [[3, 0.75]]} # Will need 3 of the 4 votes
+    # p1.sync_do {p1.cast_vote <+ [[3, 'Obama', 'first']]}
+    # p1.sync_do {p1.cast_vote <+ [[3, 'McCain', 'second']]}
+    # p1.sync_do {p1.cast_vote <+ [[3, 'Obama', 'first']]}
+    # resps = p1.sync_callback(p1.cast_vote.tabname, [[3, 'Obama', 'fourth']], 
+    #                          p1.result.tabname)
+    # basic_checks(3, :success, 'Obama', resps)
+   
     p1.stop
   end
 
