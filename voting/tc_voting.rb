@@ -25,19 +25,19 @@ class TestVoting < Test::Unit::TestCase
     assert_equal(expected_response, resps.first[2])
   end
 
-  def atest_ratio_voter_success
+  def test_ratio_voter_success
     p1 = RatioVotingBloom.new
     p1.run_bg
 
     # Test success given a ratio of 1
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
     p1.sync_do {p1.ratio <+ [[1, 1]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
-    #p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'second']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'Obama', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'Obama', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
-    # Additional assertions
+
+    # Check accumulated votes/notes
     assert_equal(['Obama', 'Obama'], resps.first[3])
     assert_equal(true, resps.first[4].include?('second'))
     assert_equal(true, resps.first[4].include?('first'))
@@ -45,33 +45,33 @@ class TestVoting < Test::Unit::TestCase
     # Test success given a ratio of 0.5
     p1.sync_do {p1.begin_vote <+ [[2, 3]]}
     p1.sync_do {p1.ratio <+ [[2, 0.5]]} # Will need 2 of the 3 votes
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama', 'first']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent2', 'McCain', 'second']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent3', 'Obama', 'third']], 
+    p1.sync_do {p1.cast_vote <+ [[2, :A, 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[2, :B, 'McCain']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, :C, 'Obama']], 
                              p1.result.tabname)
     basic_checks(2, :success, 'Obama', resps)
     
     p1.stop
   end
 
-  def atest_ratio_voter_fail
+  def test_ratio_voter_fail
     p1 = RatioVotingBloom.new
     p1.run_bg
     
     # Test failure given a ratio of 1
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
     p1.sync_do {p1.ratio <+ [[1, 1]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'McCain', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'McCain']], 
                              p1.result.tabname)
     basic_checks(1, :fail, nil, resps)
 
     # Test failure given a ratio of 0.5
     p1.sync_do {p1.begin_vote <+ [[2, 3]]}
     p1.sync_do {p1.ratio <+ [[2, 0.5]]} # Will need 2 of the 3 votes
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama', 'first']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent2', 'McCain', 'second']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent3', 'Nader', 'third']], 
+    p1.sync_do {p1.cast_vote <+ [[2, :A, 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[2, :B, 'McCain']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, :C, 'Nader']], 
                              p1.result.tabname)
     basic_checks(2, :fail, nil, resps)
 
@@ -84,68 +84,62 @@ class TestVoting < Test::Unit::TestCase
 
     # Test success
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'Obama', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'Obama', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
-    # Additional checks
+
+    # Check accumulated votes/notes
     assert_equal(['Obama', 'Obama'], resps.first[3])
     assert_equal(true, resps.first[4].include?('second'))
     assert_equal(true, resps.first[4].include?('first'))
 
     # Test fail
     p1.sync_do {p1.begin_vote <+ [[2, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent2', 'McCain', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[2, :A, 'Obama']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, :B, 'McCain']], 
                              p1.result.tabname)
     basic_checks(2, :fail, nil, resps)
     
     p1.stop
   end
 
-  def atest_majority_voter
+  def test_majority_voter
     p1 = MajorityVotingBloom.new
     p1.run_bg
 
     # Test success in a 2 agent case (need both)
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'Obama', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'Obama', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
-    # Additional checks
+
+    # Check accumulated votes/notes
     assert_equal(['Obama', 'Obama'], resps.first[3])
     assert_equal(true, resps.first[4].include?('second'))
     assert_equal(true, resps.first[4].include?('first'))
 
     # Test success in a 4 agent case (need 3)
     p1.sync_do {p1.begin_vote <+ [[2, 4]]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent2', 'Obama']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'agent3', 'McCain']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent4', 'Obama']], 
+    p1.sync_do {p1.cast_vote <+ [[2, :A, 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[2, :B, 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[2, :C, 'McCain']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, :D, 'Obama']], 
                              p1.result.tabname)
     basic_checks(2, :success, 'Obama', resps)
-    # Additional checks
+
+    # Check accumulated votes/notes
     assert_equal(3, resps.first[3].count('Obama'))
     assert_equal(1, resps.first[3].count('McCain'))
 
     # Test fail in a 2 agent case (didn't get 2)
     p1.sync_do {p1.begin_vote <+ [[3, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[3, 'agent1', 'Obama']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[3, 'agent2', 'McCain']], 
+    p1.sync_do {p1.cast_vote <+ [[3, :A, 'Obama']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[3, :B, 'McCain']], 
                              p1.result.tabname)
     basic_checks(3, :fail, nil, resps)
     
     p1.stop
   end
-
-  # Test that the result properly accumulates all of the votes from the voting agents
-  def test_votes_accum
-  end
-
-  # Test that the result properly accumulates all of the notes from the voting agents
-  def test_notes_accum
-  end
-
 end
