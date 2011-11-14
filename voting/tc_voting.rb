@@ -52,14 +52,14 @@ class TestVoting < Test::Unit::TestCase
     basic_checks(2, :success, 'Obama', resps)
 
     # Test success given a ratio of 0.75
-    #p1.sync_do {p1.begin_vote <+ [[3, 4]]}
-    #p1.sync_do {p1.ratio <+ [[3, 0.75]]} # Will need 3 of the 4 votes
-    #p1.sync_do {p1.cast_vote <+ [[3, :A, 'Obama', '']]}
-    #p1.sync_do {p1.cast_vote <+ [[3, :B, 'McCain', '']]}
-    #p1.sync_do {p1.cast_vote <+ [[3, :C, 'Obama', '']]}
-    #resps = p1.sync_callback(p1.cast_vote.tabname, [[3, :D, 'Obama', '']], 
-    #                         p1.result.tabname)
-    #basic_checks(3, :success, 'Obama', resps)
+    p1.sync_do {p1.begin_vote <+ [[3, 4]]}
+    p1.sync_do {p1.ratio <+ [[3, 0.75]]} # Will need 3 of the 4 votes
+    p1.sync_do {p1.cast_vote <+ [[3, :A, 'Obama', '']]}
+    p1.sync_do {p1.cast_vote <+ [[3, :B, 'McCain', '']]}
+    p1.sync_do {p1.cast_vote <+ [[3, :C, 'Obama', '']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[3, :D, 'Obama', '']], 
+                             p1.result.tabname)
+    basic_checks(3, :success, 'Obama', resps)
    
     p1.stop
   end

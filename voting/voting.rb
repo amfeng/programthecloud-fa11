@@ -113,7 +113,6 @@ module CountVoteCounter
   bloom :count_votes do
     # For each ballot, count all of the votes given to each candidate
     counts <= vote.group([:ballot_id, :candidate], count()) 
-    stdio <~ counts.inspected
     # For each ballot, count the total number of votes cast
     counts2 <= vote.group([:ballot_id], count()) 
     # For each ballot, store the total number of votes that will be cast
