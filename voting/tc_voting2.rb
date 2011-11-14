@@ -32,9 +32,9 @@ class TestVoting < Test::Unit::TestCase
     # Test success given a ratio of 1
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
     p1.sync_do {p1.ratio <+ [[1, 1]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'first']]}
+    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
     #p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'second']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'Obama', 'second']], 
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'Obama', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
     # Additional assertions
@@ -45,9 +45,9 @@ class TestVoting < Test::Unit::TestCase
     # Test success given a ratio of 0.5
     p1.sync_do {p1.begin_vote <+ [[2, 3]]}
     p1.sync_do {p1.ratio <+ [[2, 0.5]]} # Will need 2 of the 3 votes
-    p1.sync_do {p1.cast_vote <+ [[2, 'Obama', 'first']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'McCain', 'second']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'Obama', 'third']], 
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama', 'first']]}
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent2', 'McCain', 'second']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent3', 'Obama', 'third']], 
                              p1.result.tabname)
     basic_checks(2, :success, 'Obama', resps)
     
@@ -61,17 +61,17 @@ class TestVoting < Test::Unit::TestCase
     # Test failure given a ratio of 1
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
     p1.sync_do {p1.ratio <+ [[1, 1]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'McCain', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'McCain', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :fail, nil, resps)
 
     # Test failure given a ratio of 0.5
     p1.sync_do {p1.begin_vote <+ [[2, 3]]}
     p1.sync_do {p1.ratio <+ [[2, 0.5]]} # Will need 2 of the 3 votes
-    p1.sync_do {p1.cast_vote <+ [[2, 'Obama', 'first']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'McCain', 'second']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'Nader', 'third']], 
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama', 'first']]}
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent2', 'McCain', 'second']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent3', 'Nader', 'third']], 
                              p1.result.tabname)
     basic_checks(2, :fail, nil, resps)
 
@@ -84,8 +84,8 @@ class TestVoting < Test::Unit::TestCase
 
     # Test success
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'Obama', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'Obama', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
     # Additional checks
@@ -95,8 +95,8 @@ class TestVoting < Test::Unit::TestCase
 
     # Test fail
     p1.sync_do {p1.begin_vote <+ [[2, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'McCain', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent2', 'McCain', 'second']], 
                              p1.result.tabname)
     basic_checks(2, :fail, nil, resps)
     
@@ -109,8 +109,8 @@ class TestVoting < Test::Unit::TestCase
 
     # Test success in a 2 agent case (need both)
     p1.sync_do {p1.begin_vote <+ [[1, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[1, 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'Obama', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[1, 'agent1', 'Obama', 'first']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, 'agent2', 'Obama', 'second']], 
                              p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
     # Additional checks
@@ -120,10 +120,10 @@ class TestVoting < Test::Unit::TestCase
 
     # Test success in a 4 agent case (need 3)
     p1.sync_do {p1.begin_vote <+ [[2, 4]]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'Obama', 'first']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'Obama', 'second']]}
-    p1.sync_do {p1.cast_vote <+ [[2, 'McCain', 'third']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'Obama', 'fourth']], 
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent1', 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent2', 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[2, 'agent3', 'McCain']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[2, 'agent4', 'Obama']], 
                              p1.result.tabname)
     basic_checks(2, :success, 'Obama', resps)
     # Additional checks
@@ -132,8 +132,8 @@ class TestVoting < Test::Unit::TestCase
 
     # Test fail in a 2 agent case (didn't get 2)
     p1.sync_do {p1.begin_vote <+ [[3, 2]]}
-    p1.sync_do {p1.cast_vote <+ [[3, 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[3, 'McCain', 'second']], 
+    p1.sync_do {p1.cast_vote <+ [[3, 'agent1', 'Obama']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[3, 'agent2', 'McCain']], 
                              p1.result.tabname)
     basic_checks(3, :fail, nil, resps)
     

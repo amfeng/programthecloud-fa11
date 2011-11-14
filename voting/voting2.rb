@@ -14,10 +14,11 @@ module VoteCounterProtocol
 
     # On the client side, send votes to be counted
     # @param [Object] ballot_id the unique id of the ballot
+    # @param [Object] agent agent that is casting the vote
     # @param [Object] vote specific vote
     # @param [String] note any extra information to provide along with 
     # the vote
-    interface input, :cast_vote, [:ballot_id, :vote, :note]
+    interface input, :cast_vote, [:ballot_id, :agent, :vote, :note]
 
     # Returns the result of the vote once
     # @param [Object] ballot_id the unique id of the ballot
