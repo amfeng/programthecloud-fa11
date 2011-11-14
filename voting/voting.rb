@@ -78,8 +78,8 @@ module CountVoteCounter
 
     # Scratch to hold the winning vote of a completed ballot, if one exists.
     # _Note_: There can only be one winner for a ballot. 
-    # Duplicate key error will be thrown
-    # if ratio is set improperly such that there can be multiple winners. 
+    # Duplicate key error will be thrown if num_required is set improperly
+    # such that there can be multiple winners.
     # This constraint stems from the fact that the output interface result 
     # has [:ballot_id] as its key, indicating 
     # at most one winner per ballot_id.
@@ -89,15 +89,12 @@ module CountVoteCounter
     # together in the :result column, but I would not suggest it.
   end
 
-  
   #bloom :debug do
   #  stdio <~ ongoing_ballots {|i| ["At #{budtime}, ongoing_ballots has #{i.inspect}"]}
-  #  stdio <~ ballot_ratios {|i| ["At #{budtime}, ballot_ratios has #{i.inspect}"]}
-  #  stdio <~ votes_rcvd {|i| ["At #{budtime}, votes_rcvd has #{i.inspect}"]}
+  #  stdio <~ votes {|i| ["At #{budtime}, votes_rcvd has #{i.inspect}"]}
   #  
   #  stdio <~ completed_ballots {|i| ["At #{budtime}, completed_ballots has #{i.inspect}"]}
   #  stdio <~ winning_vote {|i| ["At #{budtime}, winning_vote has #{i.inspect}"]}
-  #  stdio <~ votes_needed {|i| ["At #{budtime}, votes_needed has #{i.inspect}"]}
   #end
 
   # Since we have two "rounds" of initializing a ballot (one that matches
@@ -130,6 +127,9 @@ module CountVoteCounter
   # Check for completed ballots and whether or not they have winners. A 
   # ballot is completed when the expected number of votes has been received.
   bloom :process_data do
+    # TODO: Do we want to wait until all of the votes have come in to declare
+    # a success/failure or declare it as soon as the "deciding" vote comes in?
+
     # Put a ballot's data into completed_ballots if the count in 
     # ballot_summary equals num_votes in ongoing_ballots for that ballot.
     completed_ballots <= (ballot_summary * ongoing_ballots).pairs(:ballot_id => :ballot_id, :cnt => :num_votes) do |s, b|
@@ -202,11 +202,6 @@ end
 module UnanimousVoteCounter
   include RatioVoteCounter
 
-  # Bypass the :ratio interface completely and insert [:ballotid, 1]
-  # into ballot_ratios whenever a new ballot is put onto
-  # begin_vote. No need to check if ballot_id already exists in
-  # ballot_ratios because ratio = 1 regardless.
-  # @override
   bloom :unanimous_delegate do
     ratio <= begin_vote {|bv| [bv.ballot_id, 1]}
   end
@@ -219,11 +214,6 @@ end
 module MajorityVoteCounter
   include CountVoteCounter
 
-  # Bypass the :ratio interface completely and insert [:ballotid, floor(0.5*num_members)+1]
-  # into ballot_ratios whenever a new ballot is put onto begin_vote. No need
-  # to check if ballot_id already exists in ballot_ratios because
-  # ratio = the majority number always.
-  # @override
   bloom :majority_delegate do
     num_required <= begin_vote {|bv| [bv.ballot_id, (bv.num_votes * 0.5).floor + 1]}
   end

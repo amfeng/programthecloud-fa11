@@ -25,6 +25,10 @@ class TestVoting < Test::Unit::TestCase
     assert_equal(expected_response, resps.first[2])
   end
 
+  def test_count_voter
+    # TODO
+  end
+
   def test_ratio_voter_success
     p1 = RatioVotingBloom.new
     p1.run_bg
