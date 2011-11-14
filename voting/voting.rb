@@ -194,14 +194,26 @@ end
 # ratio is 1.
 # @see UnanimousVoteCounter extends RatioVoteCounter
 module UnanimousVoteCounter
-  include RatioVoteCounter
+  include CountVoteCounter
+
+  bloom :delegate do
+    required_votes <= preballot do
+      |b| [b.ballot_id, b.num_votes]
+    end
+  end
 end
 
 # MajorityVoteCounter is an implementation of the VoteCounterProtocol, where
 # the no of votes needed for a majority is floor(ratio * num_members) + 1
 # @see MajorityVoteCounter implements VoteCounterProtocol
 module MajorityVoteCounter
-  include VoteCounterProtocol
+  include CountVoteCounter
+
+  bloom :delegate do
+    required_votes <= preballot do
+      |b| [b.ballot_id, 0.51 * b.num_votes]
+    end
+  end
 end
 
 # SingleVoteCounter is a module that can be composed with a 
