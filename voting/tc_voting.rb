@@ -162,4 +162,12 @@ class TestVoting < Test::Unit::TestCase
     p3.stop
   end
 
+  # Test that the result properly accumulates all of the votes from the voting agents
+  def test_votes_accum
+  end
+
+  # Test that the result properly accumulates all of the notes from the voting agents
+  def test_notes_accum
+  end
+
 end
