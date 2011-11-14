@@ -117,7 +117,7 @@ module CountVoteCounter
     # Additional processing for usage in :process_data.
     # Summarize vote data for each :ballot_id at each timestep.
     ballot_summary <= votes.group([:ballot_id], count(:vote), 
-                                     accum(:vote), accum(:note))
+                                  accum(:vote), accum(:note))
     
     # Calculate number of votes for each [:ballot_id, :vote] combination 
     # at each timestep.
