@@ -52,23 +52,30 @@ module CountVoteCounter
     # begin_vote, but have not had a required number of votes sent in yet.
     table :pre_ballots, begin_vote.schema
 
-    # Table to keep track of ballots that have been initialized via
+    # Table to keep track of ballots that 1) have been initialized
+    # via begin_vote and 2) have the required number of votes set.
+    # TODO: Include status of the ballot? (e.g. 'in-progress')
     # @param [Object] ballot_id the unique id of the ballot
-    # @param [Number] num_required see :num_votes in begin_vote
+    # @param [Number] num_votes see :num_votes in begin_vote
+    # @param [Number] num_required number of votes required to declare a winner
     table :ongoing_ballots, [:ballot_id] => [:num_votes, :num_required]
+
+    # _Note_: It may be the case that there are votes for ballot_ids
+    # that are not yet in :ongoing_ballots, and vice versa due to
+    # network delay, so this information must be stored in tables.
+    # Similarly for num_required.
 
     # Table to hold votes received for ballots.
     table :votes, cast_vote.schema
 
-    # _Note_: It may be the case that there are ratios or votes for
-    # ballot_ids that are not yet in :ongoing_ballots, and vice versa
-    # due to network delay, so this information must be stored in tables.
+    # Table to hold num_required received for ballots.
+    table :required, num_required.schema
 
     # Scratch to hold summary data for a ballot, including total number
     # of votes cast, an array of those votes, and an array of notes.
     scratch :ballot_summary, [:ballot_id] => [:cnt, :votes, :notes]
 
-    # Scratch to hold no of votes cast for each vote/response for a ballot.
+    # Scratch to hold number of votes cast for each vote/response for a ballot.
     scratch :grouped_vote_counts, [:ballot_id, :vote, :cnt]
 
     # Scratch to hold completed ballot_ids and accumulated data.
@@ -91,17 +98,25 @@ module CountVoteCounter
   # the VoteCounterProtocol, and that one that passes in the number of
   # required votes for a "winning" candidate), we need two tables
   bloom :add_ballot do
+    # Persist the num_required inputs for each ballot
+    required <= num_required
+
+    # Beginning a ballot
     pre_ballots <= begin_vote
-    ongoing_ballots <= (pre_ballots * num_required).pairs(:ballot_id => :ballot_id) {
+    ongoing_ballots <= (pre_ballots * required).pairs(:ballot_id => :ballot_id) {
       |p, r| [p.ballot_id, p.num_votes, r.num_required]     
     }
+
+    # Clean up
+    pre_ballots <- (pre_ballots * ongoing_ballots).lefts(:ballot_id => :ballot_id)
+    required <- (required * ongoing_ballots).lefts(:ballot_id => :ballot_id)
   end
 
   # Accumulate votes (and associated notes) as they appear on :cast_vote.
   # _Note_: Logic enforcing the allowed number of votes per agent should
   # be handled before a vote is put onto :cast_vote.
   bloom :gather_votes do
-    # Store incoming votes in votes_rcvd table.
+    # Store incoming votes in votes table.
     votes <= cast_vote
     
     # Additional processing for usage in :process_data.
@@ -123,13 +138,12 @@ module CountVoteCounter
       [b.ballot_id, b.num_votes, s.votes, s.notes]
     end
     
-    # Process completed ballots to determine a winner (success) or 
-    # not (failure).
+    # Process ballots to determine there is a winner (success) or
+    # not (fail), or if voting is still in progress.
     
-    # Step 1: Check grouped_vote_counts for each completed ballot to 
-    # see if there exists a count that >= the votes_needed for that ballot. 
-    # If there is, indicate success along with the result. 
-    # If there is not, indicate failure with a nil result.
+    # Step 1: Check grouped_vote_counts for all ongoing_ballots to 
+    # see if there exists a count that >= the votes needed for that ballot.
+    # If there is, store it in winning_vote.
     winning_vote <= (ongoing_ballots * grouped_vote_counts).pairs(:ballot_id => :ballot_id) do |b, gc|
       # Return a winning result if we have one.
       if gc.cnt >= b.num_required
@@ -137,8 +151,9 @@ module CountVoteCounter
       end
     end
 
-    # Step 2: For all completed ballots, either return a or fail
-    # response if the minimum vote threshold was not met.
+    # Step 2: For all completed ballots, either return a success
+    # response if there is a winning vote or a fail response if the
+    # minimum vote threshold was not met.
     result <= (completed_ballots * winning_vote).outer do |b, v|
       if b.ballot_id != v.ballot_id
         [b.ballot_id, :fail, nil, b.votes, b.notes]
@@ -154,7 +169,7 @@ module CountVoteCounter
     
     # Step 3: Cleanup. Remove completed ballots from tables.
     ongoing_ballots <- (ongoing_ballots * result).lefts(:ballot_id => :ballot_id)
-    votes <- (votes * completed_ballots).lefts(:ballot_id => :ballot_id)
+    votes <- (votes * result).lefts(:ballot_id => :ballot_id)
   end
 end
 
