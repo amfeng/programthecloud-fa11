@@ -151,18 +151,18 @@ module CountVoteCounter
       end
     end
 
-    # Step 2: For all completed ballots, either return a success
-    # response if there is a winning vote or a fail response if the
-    # minimum vote threshold was not met.
+    # Step 2: For all completed ballots, return a fail response if the minimum
+    # vote threshold was not met.
     result <= (completed_ballots * winning_vote).outer do |b, v|
       if b.ballot_id != v.ballot_id
         [b.ballot_id, :fail, nil, b.votes, b.notes]
       end
     end
 
-    # Step 3: For all uncompleted ballots, return a success if the minimum
-    # vote threshold was met (ending ballot prematurely). 
-    # _Note_: The accumulated votes/notes may not be accurate.
+    # Step 3: For all ballots where the vote threshold was met (completed or not),
+    # return a success response.
+    # _Note_: The accumulated votes/notes may not be accurate if the ballot ends
+    # prematurely.
     result <= (ballot_summary * winning_vote).pairs(:ballot_id => :ballot_id) { |b, v|
         [b.ballot_id, :success, v.vote, b.votes, b.notes]
     }
