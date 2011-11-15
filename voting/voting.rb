@@ -127,9 +127,6 @@ module CountVoteCounter
   # Check for completed ballots and whether or not they have winners. A 
   # ballot is completed when the expected number of votes has been received.
   bloom :process_data do
-    # TODO: Do we want to wait until all of the votes have come in to declare
-    # a success/failure or declare it as soon as the "deciding" vote comes in?
-
     # Put a ballot's data into completed_ballots if the count in 
     # ballot_summary equals num_votes in ongoing_ballots for that ballot.
     completed_ballots <= (ballot_summary * ongoing_ballots).pairs(:ballot_id => :ballot_id, :cnt => :num_votes) do |s, b|
@@ -150,21 +147,23 @@ module CountVoteCounter
       end
     end
 
-    # Step 2: Put the proper results onto output interface result for 
-    # completed ballots.
-    # There is a winner for a completed ballot if there is a winning_vote 
-    # entry with a matching ballot_id. 
-    # If there is no winning_vote entry, then there is was no winner.
+    # Step 2: For all completed ballots, either return a or fail
+    # response if the minimum vote threshold was not met.
     result <= (completed_ballots * winning_vote).outer do |b, v|
-      if b.ballot_id == v.ballot_id
-        [b.ballot_id, :success, v.vote, b.votes, b.notes]
-      else
+      if b.ballot_id != v.ballot_id
         [b.ballot_id, :fail, nil, b.votes, b.notes]
       end
     end
+
+    # Step 3: For all uncompleted ballots, return a success if the minimum
+    # vote threshold was met (ending ballot prematurely). 
+    # _Note_: The accumulated votes/notes may not be accurate.
+    result <= (ballot_summary * winning_vote).pairs(:ballot_id => :ballot_id) { |b, v|
+        [b.ballot_id, :success, v.vote, b.votes, b.notes]
+    }
     
     # Step 3: Cleanup. Remove completed ballots from tables.
-    ongoing_ballots <- (ongoing_ballots * completed_ballots).lefts(:ballot_id => :ballot_id)
+    ongoing_ballots <- (ongoing_ballots * result).lefts(:ballot_id => :ballot_id)
     votes <- (votes * completed_ballots).lefts(:ballot_id => :ballot_id)
   end
 end
