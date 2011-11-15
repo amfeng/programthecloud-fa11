@@ -53,8 +53,6 @@ module CountVoteCounter
     table :pre_ballots, begin_vote.schema
 
     # Table to keep track of ballots that have been initialized via
-    # TODO: Include status of the ballot, either 'in progress' or 
-    # begin_vote, but have not had a required_num sent in yet.
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] num_required see :num_votes in begin_vote
     table :ongoing_ballots, [:ballot_id] => [:num_votes, :num_required]
@@ -86,16 +84,8 @@ module CountVoteCounter
     scratch :winning_vote, [:ballot_id] => [:vote]
 
     # TODO: We could consider supporting multiple winners by grouping them
-    # together in the :result column, but I would not suggest it.
+    # together in the :result column.
   end
-
-  #bloom :debug do
-  #  stdio <~ ongoing_ballots {|i| ["At #{budtime}, ongoing_ballots has #{i.inspect}"]}
-  #  stdio <~ votes {|i| ["At #{budtime}, votes_rcvd has #{i.inspect}"]}
-  #  
-  #  stdio <~ completed_ballots {|i| ["At #{budtime}, completed_ballots has #{i.inspect}"]}
-  #  stdio <~ winning_vote {|i| ["At #{budtime}, winning_vote has #{i.inspect}"]}
-  #end
 
   # Since we have two "rounds" of initializing a ballot (one that matches
   # the VoteCounterProtocol, and that one that passes in the number of
