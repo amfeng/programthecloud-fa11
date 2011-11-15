@@ -143,15 +143,13 @@ class TestVoting < Test::Unit::TestCase
                              p1.result.tabname)
     basic_checks(3, :fail, nil, resps)
 
-    # FIXME: This doesn't work since we have a winning vote before 
-    # the vote has been completed
-    # # Test success in a 4 agent case (need 3)
-    # p1.sync_do {p1.begin_vote <+ [[4, 4]]}
-    # p1.sync_do {p1.cast_vote <+ [[4, :A, 'Obama']]}
-    # p1.sync_do {p1.cast_vote <+ [[4, :B, 'Obama']]}
-    # resps = p1.sync_callback(p1.cast_vote.tabname, [[4, :C, 'Obama']], 
-    #                          p1.result.tabname)
-    # basic_checks(4, :success, 'Obama', resps)
+    # Test success in a 4 agent case (need 3)
+    p1.sync_do {p1.begin_vote <+ [[4, 4]]}
+    p1.sync_do {p1.cast_vote <+ [[4, :A, 'Obama']]}
+    p1.sync_do {p1.cast_vote <+ [[4, :B, 'Obama']]}
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[4, :C, 'Obama']], 
+                             p1.result.tabname)
+    basic_checks(4, :success, 'Obama', resps)
 
     p1.stop
   end
