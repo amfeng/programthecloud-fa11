@@ -167,7 +167,7 @@ module CountVoteCounter
         [b.ballot_id, :success, v.vote, b.votes, b.notes]
     }
     
-    # Step 3: Cleanup. Remove completed ballots from tables.
+    # Step 4: Cleanup. Remove completed ballots from tables.
     ongoing_ballots <- (ongoing_ballots * result).lefts(:ballot_id => :ballot_id)
     votes <- (votes * result).lefts(:ballot_id => :ballot_id)
   end
