@@ -56,7 +56,8 @@ module CountVoteCounter
     # TODO: Include status of the ballot, either 'in progress' or 
     # begin_vote, but have not had a required_num sent in yet.
     # @param [Object] ballot_id the unique id of the ballot
-    # @param [Number] num_required see :num_votes in begin_vote
+    # @param [Number] num_votes see :num_votes in begin_vote
+    # @param [Number] num_required number of votes required to declare a winner
     table :ongoing_ballots, [:ballot_id] => [:num_votes, :num_required]
 
     # Table to hold votes received for ballots.
