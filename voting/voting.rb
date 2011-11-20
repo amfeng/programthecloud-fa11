@@ -15,30 +15,29 @@ module VoteCounterProtocol
     # On the client side, send votes to be counted
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Object] agent agent that is casting the vote
-    # @param [Object] vote specific vote
+    # @param [Object] candidate specific vote
     # @param [String] note any extra information to provide along with 
     # the vote
-    # TODO: Do we want to rename :vote to something less confusing?
-    interface input, :cast_vote, [:ballot_id, :agent, :vote, :note]
+    interface input, :cast_vote, [:ballot_id, :agent, :candidate, :note]
 
     # Returns the result of the vote once
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Symbol] status status of the vote, :success, :fail, :error
     # @param [Object] result outcome of the vote, contents depend on 
-    # :vote field of cast_vote input
+    # :candidate fields of cast_vote inputs
     # @param [Array] votes an aggregate of all of the votes cast
     # @param [Array] notes an aggregate of all of the notes sent
-    interface output, :result, [:ballot_id] => [:status, :result, 
-                                                :votes, :notes]
+    interface output, :result, [:ballot_id] => [:status, :result, :votes, :notes]
   end
 end
 
-# CountVoteCounter is an implementation of the VoteCounterProtocol in which
-# a certain number of required votes for a "winning" candidate is provided 
-# directly.
-# @see CountVoteCounter implements VoteCounterProtocol
-module CountVoteCounter
+# @abstract CountVoteCounterProtocol is an interface that extends
+# the VoteCounterProtocol, additionally taking in a number of votes
+# required to have a "winning" candidate.
+# @see CountVoteCounterProtocol extends VoteCounterProtocol
+module CountVoteCounterProtocol
   include VoteCounterProtocol
+
   state do
     # On the client side, tell the vote counter how many votes are required
     # for a winning vote. Note that the ballot must already be initialized
@@ -47,29 +46,24 @@ module CountVoteCounter
     # @param [Number] num_required the number of votes required for a 
     # winning vote (ex. unanimous = number of total votes)
     interface input, :num_required, [:ballot_id] => [:num_required]
+  end
+end
 
-    # Table to keep track of ballots that have been initialized via
-    # begin_vote, but have not had a required number of votes sent in yet.
-    table :pre_ballots, begin_vote.schema
-
-    # Table to keep track of ballots that 1) have been initialized
-    # via begin_vote and 2) have the required number of votes set.
+# CountVoteCounter is an implementation of the VoteCounterProtocol in which
+# a certain number of required votes for a "winning" candidate is provided 
+# directly.
+# @see CountVoteCounter implements CountVoteCounterProtocol
+module CountVoteCounter
+  include CountVoteCounterProtocol
+  state do
+    # Table to keep track of ballots that have been initialized.
+    # Note: To initialize a ballot, an entry *must* be placed in the
+    # begin_vote and num_required interfaces in the same timestep.
     # TODO: Include status of the ballot? (e.g. 'in-progress')
-    # @param [Object] ballot_id the unique id of the ballot
-    # @param [Number] num_votes see :num_votes in begin_vote
-    # @param [Number] num_required number of votes required to declare a winner
     table :ongoing_ballots, [:ballot_id] => [:num_votes, :num_required]
-
-    # _Note_: It may be the case that there are votes for ballot_ids
-    # that are not yet in :ongoing_ballots, and vice versa due to
-    # network delay, so this information must be stored in tables.
-    # Similarly for num_required.
 
     # Table to hold votes received for ballots.
     table :votes, cast_vote.schema
-
-    # Table to hold num_required received for ballots.
-    table :required, num_required.schema
 
     # Scratch to hold summary data for a ballot, including total number
     # of votes cast, an array of those votes, and an array of notes.
@@ -82,51 +76,32 @@ module CountVoteCounter
     scratch :completed_ballots, [:ballot_id, :num_votes, :votes, :notes]
 
     # Scratch to hold the winning vote of a completed ballot, if one exists.
-    # _Note_: There can only be one winner for a ballot. 
-    # Duplicate key error will be thrown if num_required is set improperly
-    # such that there can be multiple winners.
-    # This constraint stems from the fact that the output interface result 
-    # has [:ballot_id] as its key, indicating 
-    # at most one winner per ballot_id.
-    scratch :winning_vote, [:ballot_id] => [:vote]
-
-    # TODO: We could consider supporting multiple winners by grouping them
-    # together in the :result column.
+    # Note: There can only be one winner for a ballot. 
+    # TODO: Consider supporting multiple winners for a ballot?
+    scratch :winning_vote, [:ballot_id] => [:candidate]
   end
 
-  # Since we have two "rounds" of initializing a ballot (one that matches
-  # the VoteCounterProtocol, and that one that passes in the number of
-  # required votes for a "winning" candidate), we need two tables
+  # Add :ballot/:num_required rendezvous to :ongoing_ballots.
   bloom :add_ballot do
-    # Persist the num_required inputs for each ballot
-    required <= num_required
-
-    # Beginning a ballot
-    pre_ballots <= begin_vote
-    ongoing_ballots <= (pre_ballots * required).pairs(:ballot_id => :ballot_id) {
+    # Note: As noted in the state, an entry must be placed in :begin_vote and
+    # :num_required in the same timestep to initialize a ballot.
+    ongoing_ballots <= (begin_vote * num_required).pairs(:ballot_id => :ballot_id) {
       |p, r| [p.ballot_id, p.num_votes, r.num_required]     
     }
-
-    # Clean up
-    pre_ballots <- (pre_ballots * ongoing_ballots).lefts(:ballot_id => :ballot_id)
-    required <- (required * ongoing_ballots).lefts(:ballot_id => :ballot_id)
   end
 
   # Accumulate votes (and associated notes) as they appear on :cast_vote.
-  # _Note_: Logic enforcing the allowed number of votes per agent should
-  # be handled before a vote is put onto :cast_vote.
   bloom :gather_votes do
-    # Store incoming votes in votes table.
+    # Store incoming votes in :votes table.
     votes <= cast_vote
     
-    # Additional processing for usage in :process_data.
     # Summarize vote data for each :ballot_id at each timestep.
-    ballot_summary <= votes.group([:ballot_id], count(:vote), 
-                                  accum(:vote), accum(:note))
+    ballot_summary <= votes.group([:ballot_id], count, 
+                                  accum(:candidate), accum(:note))
     
-    # Calculate number of votes for each [:ballot_id, :vote] combination 
+    # Calculate number of votes for each [:ballot_id, :candidate] combination 
     # at each timestep.
-    grouped_vote_counts <= votes.group([:ballot_id, :vote], count)
+    grouped_vote_counts <= votes.group([:ballot_id, :candidate], count)
   end
 
   # Check for completed ballots and whether or not they have winners. A 
@@ -147,7 +122,7 @@ module CountVoteCounter
     winning_vote <= (ongoing_ballots * grouped_vote_counts).pairs(:ballot_id => :ballot_id) do |b, gc|
       # Return a winning result if we have one.
       if gc.cnt >= b.num_required
-        [gc.ballot_id, gc.vote]
+        [gc.ballot_id, gc.candidate]
       end
     end
 
@@ -161,10 +136,10 @@ module CountVoteCounter
 
     # Step 3: For all ballots where the vote threshold was met (completed or not),
     # return a success response.
-    # _Note_: The accumulated votes/notes may not be accurate if the ballot ends
+    # Note: The accumulated votes/notes may be incomplete if the ballot ends
     # prematurely.
     result <= (ballot_summary * winning_vote).pairs(:ballot_id => :ballot_id) { |b, v|
-        [b.ballot_id, :success, v.vote, b.votes, b.notes]
+        [b.ballot_id, :success, v.candidate, b.votes, b.notes]
     }
     
     # Step 4: Cleanup. Remove completed ballots from tables.
@@ -173,16 +148,12 @@ module CountVoteCounter
   end
 end
 
-
-# RatioVoteCounter is an implementation of the VoteCounterProtocol in
-# which a floating point ratio is provided to specify what ratio of
-# the total number of votes is needed for a "winning" vote. Note: the
-# calculation is rounded up, ex. votes_needed = ceil((ratio) *
-# num_votes).
-# @see RatioVoteCounter extends CountVoteCounter
-module RatioVoteCounter
-  include CountVoteCounter
-
+# @abstract RatioVoteCounterProtocol is an interface that extends
+# the CountVoteCounterProtocol, additionally taking in a floating
+# point ratio of votes required to have a "winning" candidate.
+# @see RatioVoteCounterProtocol extends CountVoteCounterProtocol
+module RatioVoteCounterProtocol
+  include CountVoteCounterProtocol
   state do
     # On the client side, tell the vote counter what ratio to set. This 
     # ratio must be set before the vote starts.
@@ -192,8 +163,21 @@ module RatioVoteCounter
     interface input, :ratio, [:ballot_id] => [:ratio]
   end
 
+end
+
+# RatioVoteCounter is an implementation of the VoteCounterProtocol in
+# which a floating point ratio is provided to specify what ratio of
+# the total number of votes is needed for a "winning" vote. 
+# Note: the calculation is rounded up, ex. votes_needed = ceil((ratio) *
+# num_votes).
+# @see RatioVoteCounter implements RatioVoteCounterProtocol and
+# extends CountVoteCounter
+module RatioVoteCounter
+  include RatioVoteCounterProtocol
+  include CountVoteCounter
+
   bloom :ratio_delegate do
-    num_required <= (ratio * pre_ballots).pairs(:ballot_id => :ballot_id) { 
+    num_required <= (ratio * begin_vote).pairs(:ballot_id => :ballot_id) { 
       |r, b| [r.ballot_id, (r.ratio * b.num_votes).ceil]
     }
   end
@@ -214,7 +198,7 @@ end
 # MajorityVoteCounter is an implementation of the VoteCounterProtocol,
 # where the number of votes needed for a majority is floor(0.5 *
 # num_members) + 1
-# @see UnanimousVoteCounter extends CountVoteCounter
+# @see MajorityVoteCounter extends CountVoteCounter
 module MajorityVoteCounter
   include CountVoteCounter
 

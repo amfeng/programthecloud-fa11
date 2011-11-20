@@ -30,11 +30,9 @@ class TestVoting < Test::Unit::TestCase
     p1.run_bg
 
     # Test success given a ratio of 1
-    p1.sync_do {p1.begin_vote <+ [[1, 2]]}
-    p1.sync_do {p1.ratio <+ [[1, 1]]}
+    p1.sync_do {p1.begin_vote <+ [[1, 2]]; p1.ratio <+ [[1, 1]]}
     p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama', 'first']]}
-    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'Obama', 'second']], 
-                             p1.result.tabname)
+    resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'Obama', 'second']], p1.result.tabname)
     basic_checks(1, :success, 'Obama', resps)
 
     # Check accumulated votes/notes
@@ -43,8 +41,7 @@ class TestVoting < Test::Unit::TestCase
     assert_equal(true, resps.first[4].include?('first'))
 
     # Test success given a ratio of 0.5
-    p1.sync_do {p1.begin_vote <+ [[2, 3]]}
-    p1.sync_do {p1.ratio <+ [[2, 0.5]]} # Will need 2 of the 3 votes
+    p1.sync_do {p1.begin_vote <+ [[2, 3]]; p1.ratio <+ [[2, 0.5]]}
     p1.sync_do {p1.cast_vote <+ [[2, :A, 'Obama']]}
     p1.sync_do {p1.cast_vote <+ [[2, :B, 'McCain']]}
     resps = p1.sync_callback(p1.cast_vote.tabname, [[2, :C, 'Obama']], 
@@ -58,16 +55,14 @@ class TestVoting < Test::Unit::TestCase
     p1.run_bg
     
     # Test failure given a ratio of 1
-    p1.sync_do {p1.begin_vote <+ [[1, 2]]}
-    p1.sync_do {p1.ratio <+ [[1, 1]]}
+    p1.sync_do {p1.begin_vote <+ [[1, 2]]; p1.ratio <+ [[1, 1]]}
     p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama']]}
     resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'McCain']], 
                              p1.result.tabname)
     basic_checks(1, :fail, nil, resps)
 
     # Test failure given a ratio of 0.5
-    p1.sync_do {p1.begin_vote <+ [[2, 3]]}
-    p1.sync_do {p1.ratio <+ [[2, 0.5]]} # Will need 2 of the 3 votes
+    p1.sync_do {p1.begin_vote <+ [[2, 3]]; p1.ratio <+ [[2, 0.5]]}
     p1.sync_do {p1.cast_vote <+ [[2, :A, 'Obama']]}
     p1.sync_do {p1.cast_vote <+ [[2, :B, 'McCain']]}
     resps = p1.sync_callback(p1.cast_vote.tabname, [[2, :C, 'Nader']], 
