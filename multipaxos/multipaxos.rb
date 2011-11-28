@@ -42,32 +42,28 @@ module Paxos
     # Table to keep track of current requests
     table :requests, [:n] => [:stage, :value]
 
-    # Table to keep track of promises made to the proposer from various acceptors
-    # Note: Acceptors also respond with the highest-number proposal they have
-    # already accepter, if any (:note)
-    table :promises, [:n, :note, :member]
-
-    # Table to keep track of accepts made to the proposer from various acceptors
-    table :accepts, [:n, :member]
-
-    # PREPARE requests to send out, at a clients' request
+    # Temporary storage to hold the next PREPARE and PROPOSE messages to send out
     scratch :to_prepare, [:n, :value]
-
-    # Proposals to send out, after the PREPARE stage has enough responses
     scratch :to_propose, [:n, :value]
+
+    # Temporary storage with the calculated highest-numbered proposal sent back
+    # by the acceptors in the PREPARE phase after a majority has been reached
+    scratch :result_max, [:ballot_id] => [:max]
+
+    # Temporary storage with the calculated value to send the PROPOSE message
+    # with, based on the highest-numbered proposal sent back in the PREPARE phase
+    scratch :result_values, [:n] => [:value]
 
     # == Acceptor state ==
     # Highest numbered PREPARE request the acceptor has ever responded to
-    scratch :accepted_prepare, [] => [:n]
+    table :accepted_prepare, [] => [:n]
 
     # Highest numbered proposal the acceptor has ever accepted
-    scratch :accepted_proposal, [] => [:n, :value]
+    table :accepted_proposal, [] => [:n, :value]
 
+    # Temporary storage to hold the next PROMISE and ACCEPT messages to send out
     scratch :to_promise, pipe_in.schema
     scratch :to_accept, pipe_in.schema
-
-    scratch :result_max, [:ballot_id] => [:max]
-    scratch :result_values, [:n] => [:value]
   end
 
   # At a client's request, send a PREPARE request to a majority of acceptors
