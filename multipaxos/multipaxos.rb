@@ -8,11 +8,11 @@ module PaxosProtocol
   state do
     # The client sends the Paxos master (proposer) a request, which it then tries to
     # get the rest of the nodes (acceptors) to agree on.
-    interface input, :request, [:id] => [:value]
+    interface input, :request, [:ident] => [:value]
 
     # The proposer sends the client back a result, after all of the acceptors have
     # accepted the new value
-    interface output, :result, [:id]
+    interface output, :result, [:ident]
   end
 end
 
