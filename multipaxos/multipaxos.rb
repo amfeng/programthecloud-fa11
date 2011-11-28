@@ -2,6 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'delivery/delivery'
 require 'membership/membership'
+require 'voting/voting'
 
 module PaxosProtocol
   include MembershipProtocol
@@ -12,7 +13,7 @@ module PaxosProtocol
 
     # The proposer sends the client back a result, after all of the acceptors have
     # accepted the new value
-    interface output, :result, [:ident]
+    interface output, :result, [:ident] => [:status]
   end
 end
 
@@ -23,6 +24,7 @@ end
 module Paxos
   include PaxosProtocol
   include PaxosInternalProtocol
+  import MajorityVoteCounter => :vc
 
   bootstrap do
     # Put negative proposal numbers into acceptor state
@@ -63,6 +65,9 @@ module Paxos
 
     scratch :to_promise, pipe_in.schema
     scratch :to_accept, pipe_in.schema
+
+    scratch :result_max, [:ballot_id] => [:max]
+    scratch :result_values, [:n] => [:value]
   end
 
   # At a client's request, send a PREPARE request to a majority of acceptors
@@ -72,6 +77,12 @@ module Paxos
 
     to_prepare <= (request * counter).pair { |r, c| [c.n, r.value] }
     requests <= to_prepare { |p| [p.n, :prepare, p.value] }
+
+    # Start vote counting for this stage
+    vc.begin_vote <= to_prepare { |p|
+      # :ballot_id is a combination of n and the current stage
+      [[p.n, :prepare], member.length] 
+    }
 
     # Send PREPARE request to all acceptors
     # TODO: Later, send to only a majority of acceptors?
@@ -90,14 +101,35 @@ module Paxos
   # or is the value that the client requested if the responses reported no
   # proposals
   bloom :propose do
-    # Save promises into persistent storage
-    promises <= pipe_out { |p|
-      [p.ident[1], p.payload, p.src] if p.ident[0] == :promise
+    # Pass promises into vote counter
+    vc.cast_vote <= pipe_out { |p|
+      [p.ident, p.src, nil, p.payload] if p.ident[0] == :prepare
     }
 
-    # TODO: Count number of promises, if majority, send out proposal
-    # TODO: Determine value to send out depending on responses
+    # Determine value to send out depending on responses
+    result_max <= vc.result.group([:ballot_id], max(:notes))
+    result_values <= (result_max * requests).pairs { |m, r|
+      if m[1] == -1 
+        # If no acceptor accepted another proposal, use the client request
+        # value
+        [r.n, r.value] if r.n == m.ballot_id[1]
+      else
+        # Else, use the highest-numbered proposal among the responses
+        [m.ballot_id[1], m.max] 
+      end
+    }
 
+    to_propose <= (vc.result * result_values).pairs { |r, v|
+      [v.n, v.value] if result.ballot_id == [:prepare, v.n]
+    }
+
+    # Start vote counting for this stage
+    vc.begin_vote <= to_propose { |p|
+      # :ballot_id is a combination of n and the current stage
+      [[p.n, :propose], member.length] 
+    }
+
+    # Update the current stage in the requests table
     requests <+- (requests * to_propose).lefts(:n => :n) { |r| 
       [r.n, :propose, r.value]
     }
@@ -114,12 +146,15 @@ module Paxos
   # Count the number of ACCEPT request responses received, if receive from
   # a majority of the acceptors, finish the request
   bloom :finish do
-    # Save accepts into persistent storage
-    accepts <= pipe_out { |p|
-      [p.ident[1], p.src] if p.ident[0] == :accept
+    # Pass accepts into vote counter
+    vc.cast_vote <= pipe_out { |p|
+      [p.ident, p.src, nil, p.payload] if p.ident[0] == :accept
     }
 
-    # TODO: Count number of acceptances, if majority, tell client we're done
+    # Count number of acceptances, if majority, tell client we're done
+    result <= vc.result { |r|
+      [r.ballot_id[1], r.status] if r.ballot_id[0] == :accept
+    }
   end
 
   # If an acceptor receives a PREPARE request with number n greater than that of
