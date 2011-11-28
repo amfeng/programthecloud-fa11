@@ -1,6 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'delivery/delivery'
+require 'membership/membership'
 
 module PaxosProtocol
   include MembershipProtocol
@@ -145,7 +146,7 @@ module Paxos
     }
 
     # Update the highest numbered proposal we have ever accepted
-    accepted_proposal <+= to_accept { |a| [pr.ident[1]] }
+    accepted_proposal <+- to_accept { |a| [pr.ident[1]] }
     
     # Send accept
     pipe_in <= to_accept
