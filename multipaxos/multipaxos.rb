@@ -27,17 +27,20 @@ module Paxos
   import MajorityVoteCounter => :vc
 
   bootstrap do
-    # Put negative proposal numbers into acceptor state
+    # Put negative proposal numbers into acceptor state and
+    # initialize the counter to a random number [0, 100k].
     accepted_proposal <= [-1]
     accepted_prepare <= [-1, nil]
+    counter <= [rand(100000), ip_port]
   end
 
   state do
     # == Proposer state ==
-    # Counter to have distinct, increasing number n's for each proposal
-    # from this proposer
-    # TODO: How to have distinct, incrementing counters for different proposers?
-    table :counter, [] => [:n]
+    # Counter of the form [n, ip_address], where 'n' is an increasing
+    # integer (starting at a random integer between 0 and 100k), and 
+    # the ip_address references this proposer. The ip address gives 
+    # distinction between overlapping 'n' between separate proposers.
+    table :counter, [] => [:n, :addr]
 
     # Table to keep track of current requests
     table :requests, [:n] => [:stage, :value]
@@ -69,9 +72,9 @@ module Paxos
   # At a client's request, send a PREPARE request to a majority of acceptors
   bloom :prepare do
     # Increment n counter
-    counter <+- counter { |c| [c.n + 1] }
+    counter <+- counter { |c| [c.n + 1, c.addr] }
 
-    to_prepare <= (request * counter).pair { |r, c| [c.n, r.value] }
+    to_prepare <= (request * counter).pair { |r, c| [[c.n, c.addr], r.value] }
     requests <= to_prepare { |p| [p.n, :prepare, p.value] }
 
     # Start vote counting for this stage
