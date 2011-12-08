@@ -4,15 +4,21 @@ require 'delivery/delivery'
 require 'membership/membership'
 require 'voting/voting'
 
+# @abstract PaxosProtocol is the abstract interface for finding concensus in a 
+# network of unreliable processes.
 module PaxosProtocol
   include MembershipProtocol
   state do
     # The client sends the Paxos master (proposer) a request, which it then tries to
     # get the rest of the nodes (acceptors) to agree on.
+    # @param [String] ident is a unique identifier attached to this request
+    # @param [Object] value is the proposed value for this request
     interface input, :request, [:ident] => [:value]
 
     # The proposer sends the client back a result, after all of the acceptors have
     # accepted the new value
+    # @param [String] ident is a unique identifier attached to this request
+    # @param [String] status is the success/failure status from the vote couting module
     interface output, :result, [:ident] => [:status]
   end
 end
@@ -84,9 +90,8 @@ module Paxos
     }
 
     # Send PREPARE request to all acceptors
-    # TODO: Later, send to only a majority of acceptors?
-    # FIXME: Each timestep could have many requests, increment counter
-    # for each one
+    # FIXME: send to only a majority of acceptors (or assume that members contains only the quorum)
+    # FIXME: Each timestep could have many requests, increment counter for each one
     pipe_in <= (member * to_prepare).combos { |m, p|
       # :ident of the message is the combination of message type plus
       # the number n of the proposal
