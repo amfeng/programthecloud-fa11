@@ -8,19 +8,33 @@ require 'membership/membership'
 class TestVoting < Test::Unit::TestCase
   class MultiPaxosTest
     include Bud
-    include PaxosProtocol
-    include PaxosInternalProtocol
+    #include PaxosProtocol
+    #include PaxosInternalProtocol
+    include Paxos
     include BestEffortDelivery
     include StaticMembership
   end
 
+  ###
+  ### Test for basic poxos version
+  ###
   def test_paxos
     p1 = MultiPaxosTest.new
     p1.run_bg
 
-    # Test success given a ratio of 1
+    p1.sync_do {p1.request <+ [['a', 1]]}
+    p1.register_callback(:result) do |r|
+      r.each do |row|
+        puts "ROW ASSERTION"
+        assert_equal(row.ident, 'a')
+        puts row.status
+      end
+    end
+
     #p1.sync_do {p1.begin_vote <+ [[1, 2]]; p1.ratio <+ [[1, 1]]}
     #p1.sync_do {p1.cast_vote <+ [[1, :A, 'Obama', 'first']]}
+
+    
 
     #resps = p1.sync_callback(p1.cast_vote.tabname, [[1, :B, 'Obama', 'second']], p1.result.tabname)
     #basic_checks(1, :success, 'Obama', resps)

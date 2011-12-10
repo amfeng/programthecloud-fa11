@@ -57,7 +57,7 @@ module Paxos
 
     # Temporary storage with the calculated highest-numbered proposal sent back
     # by the acceptors in the PREPARE phase after a majority has been reached
-    scratch :result_max, [:ballot_id] => [:max]
+    scratch :result_max, [:ballot_id] => [:maximum]
 
     # Temporary storage with the calculated value to send the PROPOSE message
     # with, based on the highest-numbered proposal sent back in the PREPARE phase
@@ -119,7 +119,7 @@ module Paxos
         [r.n, r.value] if r.n == m.ballot_id[1]
       else
         # Else, use the highest-numbered proposal among the responses
-        [m.ballot_id[1], m.max] 
+        [m.ballot_id[1], m.maximum] 
       end
     }
 
