@@ -38,7 +38,6 @@ module Paxos
     accepted_proposal <= [-1]
     accepted_prepare <= [-1, nil]
     counter <= [rand(100000), ip_port]
-    unstable <= [true]
   end
 
   state do
@@ -51,16 +50,6 @@ module Paxos
 
     # Table to keep track of current requests
     table :requests, [:n] => [:stage, :value]
-
-    # Table to determine whether this proposer is in a stable state. It is assumed
-    # that this table is bootstraped with any value, and that the value will be
-    # removed when a proposer has reached steady state.
-    table :unstable, [] => [:value]
-
-    # Table to indicate that this proposer has reached steady state. This table
-    # starts out empty, and is populated with any value when the proposer reaches
-    # steady state.
-    table :stable, [] => [:value]
 
     # Temporary storage to hold the next PREPARE and PROPOSE messages to send out
     scratch :to_prepare, [:n, :value]
@@ -88,10 +77,10 @@ module Paxos
 
   # At a client's request, send a PREPARE request to a majority of acceptors
   bloom :prepare do
-    # Increment n counter whenver there is a request
-    counter <+- (counter * request).lefts { |c| [c.n + 1, c.addr] }
+    # Increment n counter
+    counter <+- counter { |c| [c.n + 1, c.addr] }
 
-    to_prepare <= (request * counter * unstable).pair { |r, c, u| [[c.n, c.addr], r.value] }
+    to_prepare <= (request * counter).pair { |r, c| [[c.n, c.addr], r.value] }
     requests <= to_prepare { |p| [p.n, :prepare, p.value] }
 
     # Start vote counting for this stage
@@ -138,55 +127,6 @@ module Paxos
       [v.n, v.value] if result.ballot_id == [:prepare, v.n]
     }
 
-    # If we are currently in an unstable state, when a value comes
-    # up for proposal, enter steady state. Remove any value from 
-    # the table "unstable" and add a value to "stable"
-    stable <= to_propose {|p| [p.value] if stable.empty?}
-    unstable <- (unstable * to_propose).lefts {|u| [u.value]}
-
-    # Start vote counting for this stage
-    vc.begin_vote <= to_propose { |p|
-      # :ballot_id is a combination of n and the current stage
-      [[p.n, :propose], member.length] 
-    }
-
-    # Update the current stage in the requests table
-    requests <+- (requests * to_propose).lefts(:n => :n) { |r| 
-      [r.n, :propose, r.value]
-    }
-
-    # Send ACCEPT request to all acceptors
-    # TODO: Later, send to only a majority of acceptors?
-    pipe_in <= (member * to_propose).pair { |m, r, c|
-      # :ident of the message is the combination of message type plus
-      # the number n of the proposal
-      [m.host, ip_port, [:propose, p.n], p.value]
-    }
-  end
-
-  bloom :stable_propose do
-    # Pass promises into vote counter
-    #vc.cast_vote <= pipe_out { |p|
-    #  [p.ident, p.src, nil, p.payload] if p.ident[0] == :prepare
-    #}
-
-    # Determine value to send out depending on responses
-    #result_max <= vc.result.group([:ballot_id], max(:notes))
-    #result_values <= (result_max * requests).pairs { |m, r|
-    #  if m[1] == -1 
-    #    # If no acceptor accepted another proposal, use the client request
-    #    # value
-    #    [r.n, r.value] if r.n == m.ballot_id[1]
-    #  else
-    #    # Else, use the highest-numbered proposal among the responses
-    #    [m.ballot_id[1], m.maximum] 
-    #  end
-    #}
-
-    # If we are in a stable mode, propose the requested value with the current
-    # counter (which autoincrements above).
-    to_propose <= (requst * counter * stable).combos {|r, c, s| [[c.n, c.addr], r.value]}
-    
     # Start vote counting for this stage
     vc.begin_vote <= to_propose { |p|
       # :ballot_id is a combination of n and the current stage
