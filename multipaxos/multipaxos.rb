@@ -157,7 +157,7 @@ module Paxos
 
     # Send ACCEPT request to all acceptors
     # TODO: Later, send to only a majority of acceptors?
-    pipe_in <= (member * to_propose).pair { |m, r, c|
+    pipe_in <= (member * to_propose).pairs { |m, r, c|
       # :ident of the message is the combination of message type plus
       # the number n of the proposal
       [m.host, ip_port, [:propose, p.n], p.value]
@@ -167,7 +167,7 @@ module Paxos
   bloom :stable_propose do
     # If we are in a stable mode, propose the requested value with the current
     # counter (which autoincrements above).
-    to_propose <= (requst * counter * stable).combos {|r, c, s| [[c.n, c.addr], r.value]}
+    to_propose <= (request * counter * stable).combos {|r, c, s| [[c.n, c.addr], r.value]}
     
     # Start vote counting for this stage
     vc.begin_vote <+ to_propose { |p|
@@ -182,7 +182,7 @@ module Paxos
 
     # Send ACCEPT request to all acceptors
     # TODO: Later, send to only a majority of acceptors?
-    pipe_in <= (member * to_propose).pair { |m, r, c|
+    pipe_in <= (member * to_propose).pairs { |m, r, c|
       # :ident of the message is the combination of message type plus
       # the number n of the proposal
       [m.host, ip_port, [:propose, p.n], p.value]
