@@ -35,10 +35,10 @@ module Paxos
   bootstrap do
     # Put negative proposal numbers into acceptor state and
     # initialize the counter to a random number [0, 100k].
-    accepted_proposal <= [-1]
-    accepted_prepare <= [-1, nil]
-    counter <= [rand(100000), ip_port]
-    unstable <= [true]
+    accepted_proposal <= [[-1]]
+    accepted_prepare <= [[-1, nil]]
+    counter <= [[rand(100000), ip_port]]
+    unstable <= [[true]]
   end
 
   state do
