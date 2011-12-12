@@ -8,11 +8,11 @@ require 'membership/membership'
 class TestVoting < Test::Unit::TestCase
   class MultiPaxosTest
     include Bud
-    #include PaxosProtocol
-    #include PaxosInternalProtocol
+    include PaxosProtocol
+    include PaxosInternalProtocol
     include Paxos
-    # include BestEffortDelivery
-    # include StaticMembership
+    include BestEffortDelivery
+    include StaticMembership
     
     bootstrap do
       add_member <= [['localhost:54321', 1],
