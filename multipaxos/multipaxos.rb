@@ -95,7 +95,7 @@ module Paxos
     requests <= to_prepare { |p| [p.n, :prepare, p.value] }
 
     # Start vote counting for this stage
-    vc.begin_vote <= to_prepare { |p|
+    vc.begin_vote <+ to_prepare { |p|
       # :ballot_id is a combination of n and the current stage
       [[p.n, :prepare], member.length] 
     }
@@ -117,7 +117,7 @@ module Paxos
   # proposals
   bloom :propose do
     # Pass promises into vote counter
-    vc.cast_vote <= pipe_out { |p|
+    vc.cast_vote <+ pipe_out { |p|
       [p.ident, p.src, nil, p.payload] if p.ident[0] == :prepare
     }
 
@@ -145,7 +145,7 @@ module Paxos
     unstable <- (unstable * to_propose).lefts {|u| [u.value]}
 
     # Start vote counting for this stage
-    vc.begin_vote <= to_propose { |p|
+    vc.begin_vote <+ to_propose { |p|
       # :ballot_id is a combination of n and the current stage
       [[p.n, :propose], member.length] 
     }
@@ -170,7 +170,7 @@ module Paxos
     to_propose <= (requst * counter * stable).combos {|r, c, s| [[c.n, c.addr], r.value]}
     
     # Start vote counting for this stage
-    vc.begin_vote <= to_propose { |p|
+    vc.begin_vote <+ to_propose { |p|
       # :ballot_id is a combination of n and the current stage
       [[p.n, :propose], member.length] 
     }
