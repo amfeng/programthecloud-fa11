@@ -91,7 +91,7 @@ module Paxos
     # Increment n counter whenver there is a request
     counter <+- (counter * request).lefts { |c| [c.n + 1, c.addr] }
 
-    to_prepare <= (request * counter * unstable).pair { |r, c, u| [[c.n, c.addr], r.value] }
+    to_prepare <= (request * counter * unstable).combos { |r, c, u| [[c.n, c.addr], r.value] }
     requests <= to_prepare { |p| [p.n, :prepare, p.value] }
 
     # Start vote counting for this stage
@@ -141,7 +141,7 @@ module Paxos
     # If we are currently in an unstable state, when a value comes
     # up for proposal, enter steady state. Remove any value from 
     # the table "unstable" and add a value to "stable"
-    stable <= to_propose {|p| [p.value] if stable.empty?}
+    stable <+ to_propose {|p| [p.value] if stable.empty?}
     unstable <- (unstable * to_propose).lefts {|u| [u.value]}
 
     # Start vote counting for this stage
@@ -165,24 +165,6 @@ module Paxos
   end
 
   bloom :stable_propose do
-    # Pass promises into vote counter
-    #vc.cast_vote <= pipe_out { |p|
-    #  [p.ident, p.src, nil, p.payload] if p.ident[0] == :prepare
-    #}
-
-    # Determine value to send out depending on responses
-    #result_max <= vc.result.group([:ballot_id], max(:notes))
-    #result_values <= (result_max * requests).pairs { |m, r|
-    #  if m[1] == -1 
-    #    # If no acceptor accepted another proposal, use the client request
-    #    # value
-    #    [r.n, r.value] if r.n == m.ballot_id[1]
-    #  else
-    #    # Else, use the highest-numbered proposal among the responses
-    #    [m.ballot_id[1], m.maximum] 
-    #  end
-    #}
-
     # If we are in a stable mode, propose the requested value with the current
     # counter (which autoincrements above).
     to_propose <= (requst * counter * stable).combos {|r, c, s| [[c.n, c.addr], r.value]}
