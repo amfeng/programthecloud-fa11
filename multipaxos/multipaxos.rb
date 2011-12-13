@@ -140,7 +140,7 @@ module Paxos
     #### [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value]
     ###### table promises, n, rnd, value
     promises <= (pipe_out * round).pairs { |p, d|
-      [p.ident[1], p.ident[2], p.payload] if p.ident[0] == :promise and p.ident[2] == d.n
+      [p.ident[1], p.ident[2], p.payload] if p.ident[0] == "prepare" and p.ident[2] == d.n
     }
 
     promise_max <= promises.group([:n, :rnd, :value], max(:n))
