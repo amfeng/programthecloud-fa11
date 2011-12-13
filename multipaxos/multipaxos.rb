@@ -247,7 +247,6 @@ module Paxos
   # it sends a nack to the proposer.
   bloom :accept do
     # The case where we have had a prepare phase
-    stdio <~ accepted_prepare.inspected
     to_accept <= (pipe_out * accepted_prepare).pairs { |p, pr| 
       if (pr.rnd == p.ident[2] and p.ident[1][0] >= pr.n[0]) or pr.rnd != p.ident[2]
         [p.src, ip_port, [:accept, p.ident[1], p.ident[2]], nil]
