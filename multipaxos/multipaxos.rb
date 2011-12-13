@@ -137,8 +137,7 @@ module Paxos
     }
 
 
-    #### [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value]
-    ###### table promises, n, rnd, value
+    ########### Section added to replace commented out section below ##########
     promises <= (pipe_out * round).pairs { |p, d|
       [p.ident[1], p.ident[2], p.payload] if p.ident[0] == "prepare" and p.ident[2] == d.n
     }
