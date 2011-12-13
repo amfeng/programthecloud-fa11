@@ -95,14 +95,17 @@ module Paxos
     scratch :to_accept, pipe_in.schema
   end
 
-  # At a client's request, send a PREPARE request to a majority of acceptors
-  bloom :prepare do
+  bloom :increments do
     # Increment n counter whenver there is a request
     counter <+- (counter * request).lefts { |c| [c.n + 1, c.addr] }
 
     # Increment the round counter whenever we recieve a new request.
     round <+- (round * request).lefts { |r| [r.n + 1] }
+  end
 
+  # When a client submits a request, if the preparer has not reached a stabe state,
+  # then send a PREPARE request to all of the acceptors.
+  bloom :prepare do
     to_prepare <= (request * counter * unstable * round).combos { |r, c, u, d| [[c.n, c.addr], d.n, r.value] }
     requests <= to_prepare { |p| [p.n, p.rnd, :prepare, p.value] }
 
@@ -131,22 +134,44 @@ module Paxos
       [p.ident, p.src, nil, p.payload] if p.ident[0] == :promise and p.ident[2] == d.n
     }
 
-    # Determine value to send out depending on responses. 
-    result_max <= vc.result.group([:ballot_id], max(:notes))
-    result_values <= (result_max * requests * round * counter).pairs { |m, r, d, c|
-      if m.maximum <= c.n
-        # If no acceptor accepted another proposal, use the client request
-        # value
-        [r.n, r.rnd, r.value] if r.n == m.ballot_id[0] and d.n == m.ballot_id[1]
+
+    #### [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value]
+    ###### table promises, n, rnd, value
+    promises <= (pipe_out * round).pairs { |p, d|
+      [p.ident[1], p.ident[2], p.payload] if p.ident[0] == :promise and p.ident[2] == d.n
+    }
+
+    promise_max <= promises.group([???], max(:n))
+
+    to_propose <= (vc.result * promise_max * request).pairs {|r, p, rq| 
+      if p.value == nil
+        [p.n, p.rnd, rq.value] if rq.n == p.n and rq.rnd == p.rnd
       else
-        # Else, use the highest-numbered proposal among the responses
-        [m.maximum, r.rnd, ?????????????] 
+        [p.n, p.rnd, p.value]
       end
     }
 
-    to_propose <= (vc.result * result_values).pairs { |r, v|
-      [v.n, v.value] if result.ballot_id == [:prepare, v.n]
-    }
+    promoises <- (promises * to_propose).lefts
+
+    ####################
+
+
+    # Determine value to send out depending on responses. 
+    # result_max <= vc.result.group([:ballot_id], max(:notes))
+    # result_values <= (result_max * requests * round * counter).pairs { |m, r, d, c|
+    #   if m.maximum <= c.n
+    #     # If no acceptor accepted another proposal, use the client request
+    #     # value
+    #     [r.n, r.rnd, r.value] if r.n == m.ballot_id[0] and d.n == m.ballot_id[1]
+    #   else
+    #     # Else, use the highest-numbered proposal among the responses
+    #     [m.maximum, r.rnd, ?????????????] 
+    #   end
+    # }
+
+    # to_propose <= (vc.result * result_values).pairs { |r, v|
+    #   [v.n, v.rnd, v.value] if result.ballot_id == [:prepare, v.n]
+    # }
 
     # If we are currently in an unstable state, when a value comes
     # up for proposal, enter steady state. Remove any value from 
@@ -173,6 +198,9 @@ module Paxos
     }
   end
 
+
+  # In the case that the proposer is in a stable state, populate the to_propose field
+  # and execute its associated rules as defined in the "propose" block.
   bloom :stable_propose do
     # If we are in a stable mode, propose the requested value with the current
     # counter (which autoincrements above).
