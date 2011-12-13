@@ -45,7 +45,7 @@ module CountVoteCounterProtocol
     # @param [Object] ballot_id the unique id of the ballot
     # @param [Number] num_required the number of votes required for a 
     # winning vote (ex. unanimous = number of total votes)
-    interface input, :num_required, [:ballot_id] => [:num_required]
+    interface input, :num_required, [:ballot_id] => [:num]
   end
 end
 
@@ -86,7 +86,7 @@ module CountVoteCounter
     # Note: As noted in the state, an entry must be placed in :begin_vote and
     # :num_required in the same timestep to initialize a ballot.
     ongoing_ballots <= (begin_vote * num_required).pairs(:ballot_id => :ballot_id) {
-      |p, r| [p.ballot_id, p.num_votes, r.num_required]     
+      |p, r| [p.ballot_id, p.num_votes, r.num]     
     }
   end
 
