@@ -10,7 +10,9 @@ module PaxosProtocol
   include MembershipProtocol
   state do
     # The client sends the Paxos master (proposer) a request, which it then tries to
-    # get the rest of the nodes (acceptors) to agree on.
+    # get the rest of the nodes (acceptors) to agree on. It is assumed that a 
+    # interface user will only insert a request after they have recieved a result
+    # for a previous request.
     # @param [String] ident is a unique identifier attached to this request
     # @param [Object] value is the proposed value for this request
     interface input, :request, [:ident] => [:value]
@@ -19,7 +21,8 @@ module PaxosProtocol
     # accepted the new value
     # @param [String] ident is a unique identifier attached to this request
     # @param [String] status is the success/failure status from the vote couting module
-    interface output, :result, [:ident] => [:status]
+    # @param [Object] value that was agreed upon by the algorithm
+    interface output, :result, [:ident] => [:status, :value]
   end
 end
 
@@ -35,9 +38,10 @@ module Paxos
   bootstrap do
     # Put negative proposal numbers into acceptor state and
     # initialize the counter to a random number [0, 100k].
-    accepted_proposal <= [[-1]]
-    accepted_prepare <= [[-1, nil]]
+    accepted_proposal <= [[-1, -1]]
+    accepted_prepare <= [[-1, -1, nil]]
     counter <= [[rand(100000), ip_port]]
+    round <= [[0]]
     unstable <= [[true]]
   end
 
@@ -49,8 +53,11 @@ module Paxos
     # distinction between overlapping 'n' between separate proposers.
     table :counter, [] => [:n, :addr]
 
+    # Integer counter that indicates the current round of voting.
+    table :round, [] => [:n]
+
     # Table to keep track of current requests
-    table :requests, [:n] => [:stage, :value]
+    table :requests, [:n, :rnd] => [:stage, :value]
 
     # Table to determine whether this proposer is in a stable state. It is assumed
     # that this table is bootstraped with any value, and that the value will be
@@ -63,8 +70,8 @@ module Paxos
     table :stable, [] => [:value]
 
     # Temporary storage to hold the next PREPARE and PROPOSE messages to send out
-    scratch :to_prepare, [:n, :value]
-    scratch :to_propose, [:n, :value]
+    scratch :to_prepare, [:n, :rnd, :value]
+    scratch :to_propose, [:n, :rnd, :value]
 
     # Temporary storage with the calculated highest-numbered proposal sent back
     # by the acceptors in the PREPARE phase after a majority has been reached
@@ -72,14 +79,16 @@ module Paxos
 
     # Temporary storage with the calculated value to send the PROPOSE message
     # with, based on the highest-numbered proposal sent back in the PREPARE phase
-    scratch :result_values, [:n] => [:value]
+    scratch :result_values, [:n, :rnd] => [:value]
 
     # == Acceptor state ==
     # Highest numbered PREPARE request the acceptor has ever responded to
-    table :accepted_prepare, [] => [:n]
+    # (saving both the prepare number and the round number)
+    table :accepted_prepare, [] => [:n, :rnd]
 
     # Highest numbered proposal the acceptor has ever accepted
-    table :accepted_proposal, [] => [:n, :value]
+    # (saving both the proposal number and the round number)
+    table :accepted_proposal, [] => [:n, :rnd, :value]
 
     # Temporary storage to hold the next PROMISE and ACCEPT messages to send out
     scratch :to_promise, pipe_in.schema
@@ -91,22 +100,23 @@ module Paxos
     # Increment n counter whenver there is a request
     counter <+- (counter * request).lefts { |c| [c.n + 1, c.addr] }
 
-    to_prepare <= (request * counter * unstable).combos { |r, c, u| [[c.n, c.addr], r.value] }
-    requests <= to_prepare { |p| [p.n, :prepare, p.value] }
+    # Increment the round counter whenever we recieve a new request.
+    round <+- (round * request).lefts { |r| [r.n + 1] }
+
+    to_prepare <= (request * counter * unstable * round).combos { |r, c, u, d| [[c.n, c.addr], d.n, r.value] }
+    requests <= to_prepare { |p| [p.n, p.rnd, :prepare, p.value] }
 
     # Start vote counting for this stage
     vc.begin_vote <+ to_prepare { |p|
-      # :ballot_id is a combination of n and the current stage
-      [[p.n, :prepare], member.length] 
+      # :ballot_id is a combination of n, the round, and the current stage
+      [[p.n, p.rnd, :prepare], member.length] 
     }
 
     # Send PREPARE request to all acceptors
-    # FIXME: send to only a majority of acceptors (or assume that members contains only the quorum)
-    # FIXME: Each timestep could have many requests, increment counter for each one
     pipe_in <= (member * to_prepare).combos { |m, p|
       # :ident of the message is the combination of message type plus
-      # the number n of the proposal
-      [m.host, ip_port, [:prepare, p.n], nil]
+      # the number n of the proposal, and the current round
+      [m.host, ip_port, [:prepare, p.n, p.rnd], nil]
     }
   end
 
@@ -116,21 +126,21 @@ module Paxos
   # or is the value that the client requested if the responses reported no
   # proposals
   bloom :propose do
-    # Pass promises into vote counter
-    vc.cast_vote <+ pipe_out { |p|
-      [p.ident, p.src, nil, p.payload] if p.ident[0] == :prepare
+    # Pass promises into vote counter, if its round is equal to this round.
+    vc.cast_vote <+ (pipe_out * round).pairs { |p, d|
+      [p.ident, p.src, nil, p.payload] if p.ident[0] == :promise and p.ident[2] == d.n
     }
 
-    # Determine value to send out depending on responses
+    # Determine value to send out depending on responses. 
     result_max <= vc.result.group([:ballot_id], max(:notes))
-    result_values <= (result_max * requests).pairs { |m, r|
-      if m[1] == -1 
+    result_values <= (result_max * requests * round * counter).pairs { |m, r, d, c|
+      if m.maximum <= c.n
         # If no acceptor accepted another proposal, use the client request
         # value
-        [r.n, r.value] if r.n == m.ballot_id[1]
+        [r.n, r.rnd, r.value] if r.n == m.ballot_id[0] and d.n == m.ballot_id[1]
       else
         # Else, use the highest-numbered proposal among the responses
-        [m.ballot_id[1], m.maximum] 
+        [m.maximum, r.rnd, ?????????????] 
       end
     }
 
@@ -147,46 +157,26 @@ module Paxos
     # Start vote counting for this stage
     vc.begin_vote <+ to_propose { |p|
       # :ballot_id is a combination of n and the current stage
-      [[p.n, :propose], member.length] 
+      [[p.n, p.rnd, :propose], member.length] 
     }
 
     # Update the current stage in the requests table
     requests <+- (requests * to_propose).lefts(:n => :n) { |r| 
-      [r.n, :propose, r.value]
+      [r.n, r.rnd, :propose, r.value]
     }
 
     # Send ACCEPT request to all acceptors
-    # TODO: Later, send to only a majority of acceptors?
     pipe_in <= (member * to_propose).pairs { |m, r, c|
       # :ident of the message is the combination of message type plus
       # the number n of the proposal
-      [m.host, ip_port, [:propose, p.n], p.value]
+      [m.host, ip_port, [:propose, p.n, p.rnd], p.value]
     }
   end
 
   bloom :stable_propose do
     # If we are in a stable mode, propose the requested value with the current
     # counter (which autoincrements above).
-    to_propose <= (request * counter * stable).combos {|r, c, s| [[c.n, c.addr], r.value]}
-    
-    # Start vote counting for this stage
-    vc.begin_vote <+ to_propose { |p|
-      # :ballot_id is a combination of n and the current stage
-      [[p.n, :propose], member.length] 
-    }
-
-    # Update the current stage in the requests table
-    requests <+- (requests * to_propose).lefts(:n => :n) { |r| 
-      [r.n, :propose, r.value]
-    }
-
-    # Send ACCEPT request to all acceptors
-    # TODO: Later, send to only a majority of acceptors?
-    pipe_in <= (member * to_propose).pairs { |m, r, c|
-      # :ident of the message is the combination of message type plus
-      # the number n of the proposal
-      [m.host, ip_port, [:propose, p.n], p.value]
-    }
+    to_propose <= (request * counter * stable * round).combos {|r, c, s, d| [[c.n, c.addr], d.n, r.value]}
   end
 
   # Count the number of ACCEPT request responses received, if receive from
@@ -198,8 +188,8 @@ module Paxos
     }
 
     # Count number of acceptances, if majority, tell client we're done
-    result <= vc.result { |r|
-      [r.ballot_id[1], r.status] if r.ballot_id[0] == :accept
+    result <= (vc.result * requests).pairs { |r, q|
+      [r.ballot_id[1], r.status, r.result] if r.ballot_id[0] == :accept
     }
   end
 
@@ -209,25 +199,33 @@ module Paxos
   # numbered proposal to which it has already accepted (if any).
   bloom :promise do
     to_promise <= (pipe_out * accepted_proposal * accepted_prepare).combos  { |p, a, pr|
-      [p.src, ip_port, [:promise, p.n], a.value] if p.n >= pr.n
+      if pr.rnd == p.ident[2]
+        [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value] if p.n >= pr.n
+      else
+        [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], nil]
+      end
     }
 
     # Update the highest numbered PREPARE request we have ever responded to
-    accepted_prepare <+- to_promise { |pr| [pr.ident[1]] }
+    accepted_prepare <+- to_promise { |pr| [pr.ident[1], pr.ident[2]] }
 
     # Send promise
     pipe_in <= to_promise
   end
 
   # If an acceptor receives an ACCEPT request for a proposal numbered n, it accepts
-  # the proposal unless it has already promised not to in the :promise phase.
+  # the proposal unless it has already promised not to in the :promise phase. Otherwise
+  # it sends a nack to the proposer.
   bloom :accept do
+    # The case where we have had a prepare phase
     to_accept <= (pipe_out * accepted_prepare).pairs { |p, pr| 
-      [p.src, ip_port, [:accept, p.n], nil] if p.n >= pr.n    
+      if (pr.rnd == p.ident[2] and p.n >= pr.n) or pr.rnd != p.ident[2]
+        [p.src, ip_port, [:accept, p.ident[1], p.ident[2]], nil]
+      end
     }
 
     # Update the highest numbered proposal we have ever accepted
-    accepted_proposal <+- to_accept { |a| [pr.ident[1]] }
+    accepted_proposal <+- to_accept { |a| [a.ident[1], a.ident[2]]}
     
     # Send accept
     pipe_in <= to_accept
