@@ -38,8 +38,8 @@ module Paxos
   bootstrap do
     # Put negative proposal numbers into acceptor state and
     # initialize the counter to a random number [0, 100k].
-    accepted_proposal <= [[-1, -1]]
-    accepted_prepare <= [[-1, -1, nil]]
+    accepted_proposal <= [[nil, -1, -1, nil]]
+    accepted_prepare <= [[nil, -1, -1]]
     counter <= [[rand(100000), ip_port]]
     round <= [[0]]
     unstable <= [[true]]
@@ -86,11 +86,11 @@ module Paxos
     # == Acceptor state ==
     # Highest numbered PREPARE request the acceptor has ever responded to
     # (saving both the prepare number and the round number)
-    table :accepted_prepare, [] => [:n, :rnd]
+    table :accepted_prepare, [:key] => [:n, :rnd]
 
     # Highest numbered proposal the acceptor has ever accepted
     # (saving both the proposal number and the round number)
-    table :accepted_proposal, [] => [:n, :rnd, :value]
+    table :accepted_proposal, [:key] => [:n, :rnd, :value]
 
     # Temporary storage to hold the next PROMISE and ACCEPT messages to send out
     scratch :to_promise, pipe_in.schema
@@ -236,7 +236,7 @@ module Paxos
     }
 
     # Update the highest numbered PREPARE request we have ever responded to
-    accepted_prepare <+- to_promise { |pr| [pr.ident[1], pr.ident[2]] }
+    accepted_prepare <+- to_promise { |pr| [nil, pr.ident[1], pr.ident[2]] }
 
     # Send promise
     pipe_in <= to_promise
@@ -254,7 +254,8 @@ module Paxos
     }
 
     # Update the highest numbered proposal we have ever accepted
-    accepted_proposal <+- to_accept { |a| [a.ident[1], a.ident[2]]}
+    # FIXME: Need to add the value of this proposal to accepted_proposal
+    accepted_proposal <+- to_accept { |a| [nil, a.ident[1], a.ident[2], nil]}
     
     # Send accept
     pipe_in <= to_accept
