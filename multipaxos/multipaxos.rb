@@ -72,6 +72,8 @@ module Paxos
     # Temporary storage to hold the next PREPARE and PROPOSE messages to send out
     scratch :to_prepare, [:n, :rnd, :value]
     scratch :to_propose, [:n, :rnd, :value]
+    table :promises, [:n, :rnd, :value]
+    scratch :promise_max, [:n, :rnd, :value]
 
     # Temporary storage with the calculated highest-numbered proposal sent back
     # by the acceptors in the PREPARE phase after a majority has been reached
@@ -141,7 +143,7 @@ module Paxos
       [p.ident[1], p.ident[2], p.payload] if p.ident[0] == :promise and p.ident[2] == d.n
     }
 
-    promise_max <= promises.group([???], max(:n))
+    promise_max <= promises.group([:n, :rnd, :value], max(:n))
 
     to_propose <= (vc.result * promise_max * request).pairs {|r, p, rq| 
       if p.value == nil
@@ -151,7 +153,7 @@ module Paxos
       end
     }
 
-    promoises <- (promises * to_propose).lefts
+    promises <- (promises * to_propose).lefts
 
     ####################
 

@@ -49,15 +49,15 @@ class TestVoting < Test::Unit::TestCase
 
   # Test for multi paxos version
   def test_multi_paxos2
-    p1 = MultiPaxosTest.new(:port=>54320)
+    p1 = MultiPaxosTest.new(:port => 54320)
     p1.run_bg
-    p2 = MultiPaxosTest.new(:port=>54321)
+    p2 = MultiPaxosTest.new(:port => 54321)
     p2.run_bg
-    p3 = MultiPaxosTest.new(:port=>54322)
+    p3 = MultiPaxosTest.new(:port => 54322)
     p3.run_bg
-    p4 = MultiPaxosTest.new(:port=>54323)
+    p4 = MultiPaxosTest.new(:port => 54323)
     p4.run_bg
-    p5 = MultiPaxosTest.new(:port=>54324)
+    p5 = MultiPaxosTest.new(:port => 54324)
     p5.run_bg
 
     p1.sync_do {p1.request <+ [[1, 'a']]}
