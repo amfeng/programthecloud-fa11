@@ -114,7 +114,7 @@ module Paxos
     # Start vote counting for this stage
     vc.begin_vote <+ to_prepare { |p|
       # :ballot_id is a combination of n, the round, and the current stage
-      [[p.n, p.rnd, :prepare], member.length] 
+      [["promise", p.n, p.rnd], member.length] 
     }
 
     # Send PREPARE request to all acceptors
@@ -133,24 +133,33 @@ module Paxos
   bloom :propose do
     # Pass promises into vote counter, if its round is equal to this round.
     vc.cast_vote <+ (pipe_out * round).pairs { |p, d|
-      [p.ident, p.src, nil, p.payload] if p.ident[0] == :promise and p.ident[2] == d.n
+      [p.ident, p.src, nil, p.payload] if p.ident[0] == "promise" and p.ident[2] + 1 == d.n
     }
 
 
     ########### Section added to replace commented out section below ##########
     promises <= (pipe_out * round).pairs { |p, d|
-      [p.ident[1], p.ident[2], p.payload] if p.ident[0] == "prepare" and p.ident[2] == d.n
+      [p.ident[1], p.ident[2], p.payload] if p.ident[0] == "promise" and p.ident[2] + 1 == d.n
     }
 
+    stdio <~ [[vc.result.inspected]]
+    #stdio <~ [[vc.votes.inspected]]
+    #stdio <~ [[vc.ongoing_ballots.inspected]]
+    
     promise_max <= promises.group([:n, :rnd, :value], max(:n))
 
-    to_propose <= (vc.result * promise_max * request).pairs {|r, p, rq| 
+    to_propose <= (vc.result * promise_max * requests).pairs {|r, p, rq| 
       if p.value == nil
         [p.n, p.rnd, rq.value] if rq.n == p.n and rq.rnd == p.rnd
       else
         [p.n, p.rnd, p.value]
       end
     }
+    
+    
+    temp :foo <= (vc.result * promise_max * request).pairs
+    stdio <~ [[foo.inspected]]
+    stdio <~ [[request.inspected]]
 
     promises <- (promises * to_propose).lefts
 
@@ -229,9 +238,9 @@ module Paxos
   bloom :promise do
     to_promise <= (pipe_out * accepted_proposal * accepted_prepare).combos  { |p, a, pr|
       if pr.rnd == p.ident[2]
-        [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value] if p.ident[1][0] >= pr.n[0]
+        [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value] if p.ident[1][0] >= pr.n[0] and p.ident[0] == "prepare"
       else
-        [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], nil]
+        [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], nil] if p.ident[0] == "prepare"
       end
     }
 
@@ -249,7 +258,7 @@ module Paxos
     # The case where we have had a prepare phase
     to_accept <= (pipe_out * accepted_prepare).pairs { |p, pr| 
       if (pr.rnd == p.ident[2] and p.ident[1][0] >= pr.n[0]) or pr.rnd != p.ident[2]
-        [p.src, ip_port, [:accept, p.ident[1], p.ident[2]], nil]
+        [p.src, ip_port, [:accept, p.ident[1], p.ident[2]], nil] if p.ident[0] == "propose"
       end
     }
 

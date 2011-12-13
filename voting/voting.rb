@@ -25,9 +25,9 @@ module VoteCounterProtocol
     # @param [Symbol] status status of the vote, :success, :fail, :error
     # @param [Object] result outcome of the vote, contents depend on 
     # :candidate fields of cast_vote inputs
-    # @param [Array] votes an aggregate of all of the votes cast
+    # @param [Array] cast_votes an aggregate of all of the votes cast
     # @param [Array] notes an aggregate of all of the notes sent
-    interface output, :result, [:ballot_id] => [:status, :result, :votes, :notes]
+    interface output, :result, [:ballot_id] => [:status, :result, :cast_votes, :notes]
   end
 end
 
@@ -60,20 +60,20 @@ module CountVoteCounter
     # Note: To initialize a ballot, an entry *must* be placed in the
     # begin_vote and num_required interfaces in the same timestep.
     # TODO: Include status of the ballot? (e.g. 'in-progress')
-    table :ongoing_ballots, [:ballot_id] => [:num_votes, :num_required]
+    table :ongoing_ballots, [:ballot_id] => [:num_votes, :num]
 
     # Table to hold votes received for ballots.
     table :votes, cast_vote.schema
 
     # Scratch to hold summary data for a ballot, including total number
     # of votes cast, an array of those votes, and an array of notes.
-    scratch :ballot_summary, [:ballot_id] => [:cnt, :votes, :notes]
+    scratch :ballot_summary, [:ballot_id] => [:cnt, :cast_votes, :notes]
 
     # Scratch to hold number of votes cast for each vote/response for a ballot.
     scratch :grouped_vote_counts, [:ballot_id, :vote, :cnt]
 
     # Scratch to hold completed ballot_ids and accumulated data.
-    scratch :completed_ballots, [:ballot_id, :num_votes, :votes, :notes]
+    scratch :completed_ballots, [:ballot_id, :num_votes, :cast_votes, :notes]
 
     # Scratch to hold the winning vote of a completed ballot, if one exists.
     # Note: There can only be one winner for a ballot. 
@@ -110,7 +110,7 @@ module CountVoteCounter
     # Put a ballot's data into completed_ballots if the count in 
     # ballot_summary equals num_votes in ongoing_ballots for that ballot.
     completed_ballots <= (ballot_summary * ongoing_ballots).pairs(:ballot_id => :ballot_id, :cnt => :num_votes) do |s, b|
-      [b.ballot_id, b.num_votes, s.votes, s.notes]
+      [b.ballot_id, b.num_votes, s.cast_votes, s.notes]
     end
     
     # Process ballots to determine there is a winner (success) or
@@ -121,7 +121,7 @@ module CountVoteCounter
     # If there is, store it in winning_vote.
     winning_vote <= (ongoing_ballots * grouped_vote_counts).pairs(:ballot_id => :ballot_id) do |b, gc|
       # Return a winning result if we have one.
-      if gc.cnt >= b.num_required
+      if gc.cnt >= b.num
         [gc.ballot_id, gc.candidate]
       end
     end
@@ -130,7 +130,7 @@ module CountVoteCounter
     # vote threshold was not met.
     result <= (completed_ballots * winning_vote).outer do |b, v|
       if b.ballot_id != v.ballot_id
-        [b.ballot_id, :fail, nil, b.votes, b.notes]
+        [b.ballot_id, :fail, nil, b.cast_votes, b.notes]
       end
     end
 
@@ -139,7 +139,7 @@ module CountVoteCounter
     # Note: The accumulated votes/notes may be incomplete if the ballot ends
     # prematurely.
     result <= (ballot_summary * winning_vote).pairs(:ballot_id => :ballot_id) { |b, v|
-        [b.ballot_id, :success, v.candidate, b.votes, b.notes]
+        [b.ballot_id, :success, v.candidate, b.cast_votes, b.notes]
     }
     
     # Step 4: Cleanup. Remove completed ballots from tables.
