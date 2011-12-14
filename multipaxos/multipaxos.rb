@@ -161,13 +161,7 @@ module Paxos
     # Start vote counting for this stage
     vc.begin_vote <+ to_propose { |p|
       # :ballot_id is a combination of n and the current stage
-      [[p.n, p.rnd, :accept], member.length] 
-    }
-
-    temp :bar <= to_propose { |p|
-      # :ballot_id is a combination of n and the current stage
-      [[p.n, p.rnd, :accept], member.length] 
-      puts [p.n, p.rnd, :accept].inspect
+      [["accept", p.n, p.rnd], member.length] 
     }
 
     # Update the current stage in the requests table
@@ -196,18 +190,19 @@ module Paxos
   # a majority of the acceptors, finish the request
   bloom :finish do
     # Pass accepts into vote counter
-    vc.cast_vote <= pipe_out { |p|
-      [p.ident[1], p.ident[2], :accept] if p.ident[0] == "accept"
+    vc.cast_vote <= (pipe_out * round).pairs { |p, d|
+      [p.ident, p.src, nil, p.payload] if p.ident[0] == "accept" and p.ident[2] + 1 == d.n
     }
-
-    stdio <~ [[vc.num_required.inspected]]
 
     #stdio <~ [[result.inspected]]
 
     # Count number of acceptances, if majority, tell client we're done
     result <= (vc.result * requests).pairs { |r, q|
-      [r.ballot_id[1], r.status, r.result] if r.ballot_id[0] == :accept
+      [r.ballot_id[1], r.status, r.result] if r.ballot_id[0] == "accept"
     }
+    
+    requests <- (requests * result).lefts
+
   end
 
   # If an acceptor receives a PREPARE request with number n greater than that of
