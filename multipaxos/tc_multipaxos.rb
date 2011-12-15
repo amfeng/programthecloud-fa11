@@ -147,6 +147,44 @@ class TestVoting < Test::Unit::TestCase
   #   a5.stop
   # end
   
+  # Test paxos for success after an acceptor fails before accepting a prepare request
+  def test_fail_before_accepting
+    p1 = MultiPaxosTest.new(:port => 54320)
+    a1 = MultiPaxosTest.new(:port => 54321)
+    a2 = MultiPaxosTest.new(:port => 54322)
+    a3 = MultiPaxosTest.new(:port => 54323)
+    a4 = MultiPaxosTest.new(:port => 54324)
+    a5 = MultiPaxosTest.new(:port => 54325)
+    p1.run_bg
+    a1.run_bg
+    a2.run_bg
+    a3.run_bg
+    a4.run_bg
+    a5.run_bg
+            
+    q = Queue.new
+    p1.register_callback(:result) do |r|
+      r.each do |row|
+        puts "Multipaxos Output:", row.inspect
+        assert_equal(row[1], :success)
+      end
+      q.push true
+    end
+    
+    p1.sync_do { 
+      p1.request <+ [[1, 'a']]
+      a1.stop
+    }
+    q.pop
+    
+    p1.stop
+    a1.stop
+    a2.stop
+    a3.stop
+    a4.stop
+    a5.stop
+  end
+
   # Test paxos for success after an acceptor fails after accepts a prepare request
   # def test_fail_after_accepting
   #   p1 = MultiPaxosTest.new(:port => 54320)
@@ -240,41 +278,41 @@ class TestVoting < Test::Unit::TestCase
   #   a5.stop
   # end
 
-  def test_multi_paxos
-    p1 = MultiPaxosTest.new(:port => 54320)
-    p2 = MultiPaxosTest.new(:port => 54326)
-    a1 = MultiPaxosTest.new(:port => 54321)
-    a2 = MultiPaxosTest.new(:port => 54322)
-    a3 = MultiPaxosTest.new(:port => 54323)
-    a4 = MultiPaxosTest.new(:port => 54324)
-    a5 = MultiPaxosTest.new(:port => 54325)
-    p1.run_bg
-    p2.run_bg
-    a1.run_bg
-    a2.run_bg
-    a3.run_bg
-    a4.run_bg
-    a5.run_bg
+  # def test_multi_paxos
+  #   p1 = MultiPaxosTest.new(:port => 54320)
+  #   p2 = MultiPaxosTest.new(:port => 54326)
+  #   a1 = MultiPaxosTest.new(:port => 54321)
+  #   a2 = MultiPaxosTest.new(:port => 54322)
+  #   a3 = MultiPaxosTest.new(:port => 54323)
+  #   a4 = MultiPaxosTest.new(:port => 54324)
+  #   a5 = MultiPaxosTest.new(:port => 54325)
+  #   p1.run_bg
+  #   p2.run_bg
+  #   a1.run_bg
+  #   a2.run_bg
+  #   a3.run_bg
+  #   a4.run_bg
+  #   a5.run_bg
 
-    q = Queue.new
-    p2.register_callback(:result) do |r|
-      r.each do |row|
-        puts "Multipaxos Output:", row.inspect
-        assert_equal(row[1], :success)
-      end
-      q.push true
-    end
+  #   q = Queue.new
+  #   p2.register_callback(:result) do |r|
+  #     r.each do |row|
+  #       puts "Multipaxos Output:", row.inspect
+  #       assert_equal(row[1], :success)
+  #     end
+  #     q.push true
+  #   end
 
-    p1.sync_do { p1.request <+ [[1, 'a']]}
-    p2.sync_do { p2.request <+ [[2, 'b']]}
-    q.pop
+  #   p1.sync_do { p1.request <+ [[1, 'a']]}
+  #   p2.sync_do { p2.request <+ [[2, 'b']]}
+  #   q.pop
     
-    p1.stop
-    p2.stop
-    a1.stop
-    a2.stop
-    a3.stop
-    a4.stop
-    a5.stop
-  end
+  #   p1.stop
+  #   p2.stop
+  #   a1.stop
+  #   a2.stop
+  #   a3.stop
+  #   a4.stop
+  #   a5.stop
+  # end
 end
