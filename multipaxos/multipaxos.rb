@@ -105,10 +105,12 @@ module Paxos
     round <+- (round * request).lefts { |r| [r.n + 1] }
   end
 
-  # When a client submits a request, if the preparer has not reached a stabe state,
+  # When a client submits a request, if the preparer has not reached a stable state,
   # then send a PREPARE request to all of the acceptors.
   bloom :prepare do
-    to_prepare <= (request * counter * unstable * round).combos { |r, c, u, d| [[c.n, c.addr], d.n, r.value] }
+    to_prepare <= (request * counter * unstable * round).combos { 
+      |r, c, u, d| [[c.n, c.addr], d.n, r.value] 
+    }
     requests <= to_prepare { |p| [p.n, p.rnd, :prepare, p.value] }
 
     # Start vote counting for this stage
@@ -210,7 +212,8 @@ module Paxos
   # not to accept any future proposals numbered less than n and with the highest
   # numbered proposal to which it has already accepted (if any).
   bloom :promise do
-    to_promise <= (pipe_out * accepted_proposal * accepted_prepare).combos  { |p, a, pr|
+    to_promise <= (pipe_out * accepted_proposal * accepted_prepare).combos  { 
+      |p, a, pr|
       if pr.rnd == p.ident[2]
         [p.src, ip_port, [:promise, p.ident[1], p.ident[2]], a.value] if p.ident[1][0] >= pr.n[0] and p.ident[0] == "prepare"
       else
