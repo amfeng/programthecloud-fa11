@@ -7,6 +7,17 @@ require 'membership/membership'
 
 ### Test message sequences are are derived from
 # http://en.wikipedia.org/wiki/Paxos_(computer_science)#Error_cases_in_basic_Paxos
+#
+# Note, the tests hang nondeterministically, so they should not be run as a group.
+# Please run with
+#   ruby tc_multipaxos.rb -n test_name
+# to run each test individually.  The tests are:
+#    test_basic_paxos
+#    test_failure_learner
+#    test_duelling_proposers
+#    test_fail_before_accepting
+#    test_fail_after_accepting
+#    test_multi_paxos
 
 class TestVoting < Test::Unit::TestCase
   class MultiPaxosTest
