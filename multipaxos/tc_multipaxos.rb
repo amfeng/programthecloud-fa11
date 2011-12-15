@@ -57,6 +57,11 @@ class TestVoting < Test::Unit::TestCase
    a5.stop
   end
 
+  ### This test attempts to emulate the "failure of redundant learner" case in
+  ### http://en.wikipedia.org/wiki/Paxos_(computer_science)#Error_cases_in_basic_Paxos
+  ### but hangs.  We are not sure if this is an actual bug or a problem with the
+  ### test infrastructure that requres us to call p1.stop before we are able to
+  ### register a callback for p1.result.
   def test_failure_learner
     p1 = MultiPaxosTest.new(:port => 54320)
     a1 = MultiPaxosTest.new(:port => 54321)
@@ -130,10 +135,18 @@ class TestVoting < Test::Unit::TestCase
       puts "Entered a2's accepted_prepare callback"
       p1.stop
       a1.stop
-      p2.sync_do { p2.request <+ [[1, 'a']] }
+      p2.sync_do { p2.request <+ [[1, 'b']] }
     end
     q1.push true
 
+    ### Warning, non-determinism.
+    ### If you increase this request ID, then p2 needs to obtain a proposal
+    ### number  that is higher than p1's proposal number in order to succeed.
+    ### However, such a test hangs occasionally when p1 is initialized with a
+    ### higher sequence number (e.g., 2).  We're not sure if it is a bug in the
+    ### code or p2 is just taking a long time to increment its proposal number.
+    ### Also, there is a rand(100000), so p1 could be bootstrapped with a very
+    ### large initial proposal number compared to p2's proposal number.
     p1.sync_do { p1.request <+ [[1, 'a']]}
     q1.pop
     q2.pop
