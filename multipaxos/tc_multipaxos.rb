@@ -44,7 +44,6 @@ class TestVoting < Test::Unit::TestCase
    q = Queue.new
    p1.register_callback(:result) do |r|
     r.each do |row|
-      puts "Basic Multipaxos Output:", row.inspect
       assert_equal(row[1, 2], [:success, 'a'])
     end
     q.push true
@@ -82,7 +81,6 @@ class TestVoting < Test::Unit::TestCase
 
     q = Queue.new
     a1.register_callback(:accepted_proposal) do
-      puts "Entered a1's accepted_proposal callback"
       # Stopping a1
       p1.stop
       q.push true
@@ -91,7 +89,6 @@ class TestVoting < Test::Unit::TestCase
     q2 = Queue.new
     p1.register_callback(:result) do |r|
       r.each do |row|
-        puts "Multipaxos Output:", row.inspect
         assert_equal(row[1, 2], [:success, 'a'])
       end
       q2.push true
@@ -129,7 +126,6 @@ class TestVoting < Test::Unit::TestCase
     q2 = Queue.new
     p2.register_callback(:result) do |r|
       r.each do |row|
-        puts "Duelling Proposers Output:", row.inspect
         assert_equal(row[1, 2], [:success, 'a'])
       end
       q2.push true
@@ -137,7 +133,6 @@ class TestVoting < Test::Unit::TestCase
 
     q1 = Queue.new
     a1.register_callback(:accepted_prepare) do
-      puts "Entered a2's accepted_prepare callback"
       p1.stop
       a1.stop
       p2.sync_do { p2.request <+ [[1, 'b']] }
@@ -183,7 +178,6 @@ class TestVoting < Test::Unit::TestCase
     q = Queue.new
     p1.register_callback(:result) do |r|
       r.each do |row|
-        puts "Multipaxos Output:", row.inspect
         assert_equal(row[1, 2], [:success, 'a'])
       end
       q.push true
@@ -223,70 +217,22 @@ class TestVoting < Test::Unit::TestCase
     # Paxos should still succeed since there are 4 nodes still alive
     q1 = Queue.new
     a1.register_callback(:accepted_prepare) do
-      puts "Entered a1's accepted_prepare callback"
       # Stopping a1
       a1.stop
       q1.push true
     end
 
-    # q2 = Queue.new
-    # a2.register_callback(:accepted_prepare) do
-    #   puts "Entered a2's accepted_prepare callback"
-    #   # Stopping a1
-    #   a2.stop
-    #   q2.push true
-    # end
-
-    q3 = Queue.new
+    q2 = Queue.new
     p1.register_callback(:result) do |r|
       r.each do |row|
-        puts "Multipaxos Output:", row.inspect
         assert_equal(row[1, 2], [:success, 'a'])
       end
-      q3.push true
+      q2.push true
     end
 
     p1.sync_do { p1.request <+ [[1, 'a']]}
     q1.pop
-    # q2.pop
-    q3.pop
-
-    # p1.register_callback(:result) do |r|
-    #   assert_equal(1,1)
-    #   r.each do |row|
-    #     puts "Multipaxos Output:", row.inspect
-    #     assert_equal(row[1, 2], [:success, 'a'])
-    #   end
-
-    #   puts "Requests:", p1.result.first.inspect
-    #   puts "Acceptor 1:", a1.accepted_prepare.first.inspect
-    #   puts "Acceptor 2:", a2.accepted_prepare.first.inspect
-    #   puts "Acceptor 3:", a3.accepted_prepare.first.inspect
-    #   puts "Acceptor 4:", a4.accepted_prepare.first.inspect
-    #   puts "Acceptor 5:", a5.accepted_prepare.first.inspect
-    # end
-
-    # # p1.sync_callback(:request, [[1, 'a']], :result)
-    # p1.sync_do{ p1.request <+ [[1, 'a']]}
-    # # p1.tick
-    # # p1.tick
-    # # p1.tick
-    # # p1.tick
-    # # p1.tick
-    # # p1.tick
-
-    # sleep 5
-
-    # a2.register_callback(:accepted_prepare) do
-    #   assert_equal(1,1)
-    # end
-
-    # a3.register_callback(:accepted_prepare) do
-    #   assert_equal(1,1)
-    # end
-
-    # a1.stop
-
+    q2.pop
 
     p1.stop
     a1.stop
@@ -316,7 +262,6 @@ class TestVoting < Test::Unit::TestCase
     q = Queue.new
     p2.register_callback(:result) do |r|
       r.each do |row|
-        puts "Multipaxos Output:", row.inspect
         assert_equal(row[1, 2], [:success, 'b'])
       end
       q.push true
