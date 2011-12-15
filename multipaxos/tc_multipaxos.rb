@@ -5,6 +5,9 @@ require 'multipaxos'
 require 'delivery/delivery'
 require 'membership/membership'
 
+### Test message sequences are are derived from
+# http://en.wikipedia.org/wiki/Paxos_(computer_science)#Error_cases_in_basic_Paxos
+
 class TestVoting < Test::Unit::TestCase
   class MultiPaxosTest
     include Bud
@@ -23,6 +26,7 @@ class TestVoting < Test::Unit::TestCase
     end
   end
 
+  ### Simple test of basic paxos functionality.
   def test_basic_paxos
     p1 = MultiPaxosTest.new(:port => 54320)
     a1 = MultiPaxosTest.new(:port => 54321)
@@ -41,7 +45,7 @@ class TestVoting < Test::Unit::TestCase
    p1.register_callback(:result) do |r|
     r.each do |row|
       puts "Basic Multipaxos Output:", row.inspect
-      assert_equal(row[1], :success)
+      assert_equal(row[1, 2], [:success, 'a'])
     end
     q.push true
    end
@@ -88,7 +92,7 @@ class TestVoting < Test::Unit::TestCase
     p1.register_callback(:result) do |r|
       r.each do |row|
         puts "Multipaxos Output:", row.inspect
-        assert_equal(row[1], :success)
+        assert_equal(row[1, 2], [:success, 'a'])
       end
       q2.push true
     end
@@ -105,6 +109,7 @@ class TestVoting < Test::Unit::TestCase
     a5.stop
   end
 
+  ### Tests what happens when propoers are unreliable.
   def test_duelling_proposers
     p1 = MultiPaxosTest.new(:port => 54320)
     p2 = MultiPaxosTest.new(:port => 54326)
@@ -125,7 +130,7 @@ class TestVoting < Test::Unit::TestCase
     p2.register_callback(:result) do |r|
       r.each do |row|
         puts "Duelling Proposers Output:", row.inspect
-        assert_equal(row[1], :success)
+        assert_equal(row[1, 2], [:success, 'a'])
       end
       q2.push true
     end
@@ -160,7 +165,7 @@ class TestVoting < Test::Unit::TestCase
     a5.stop
   end
 
-  # Test paxos for success after an acceptor fails before accepting a prepare request
+  # Test paxos for success after an acceptor fails before accepting a prepare request.
   def test_fail_before_accepting
     p1 = MultiPaxosTest.new(:port => 54320)
     a1 = MultiPaxosTest.new(:port => 54321)
@@ -179,7 +184,7 @@ class TestVoting < Test::Unit::TestCase
     p1.register_callback(:result) do |r|
       r.each do |row|
         puts "Multipaxos Output:", row.inspect
-        assert_equal(row[1], :success)
+        assert_equal(row[1, 2], [:success, 'a'])
       end
       q.push true
     end
@@ -198,7 +203,7 @@ class TestVoting < Test::Unit::TestCase
     a5.stop
   end
 
-  # Test paxos for success after an acceptor fails after accepts a prepare request
+  # Test paxos for success after an acceptor fails after accepts a prepare request.
   def test_fail_after_accepting
     p1 = MultiPaxosTest.new(:port => 54320)
     a1 = MultiPaxosTest.new(:port => 54321)
@@ -236,7 +241,7 @@ class TestVoting < Test::Unit::TestCase
     p1.register_callback(:result) do |r|
       r.each do |row|
         puts "Multipaxos Output:", row.inspect
-        assert_equal(row[1], :success)
+        assert_equal(row[1, 2], [:success, 'a'])
       end
       q3.push true
     end
@@ -250,7 +255,7 @@ class TestVoting < Test::Unit::TestCase
     #   assert_equal(1,1)
     #   r.each do |row|
     #     puts "Multipaxos Output:", row.inspect
-    #     assert_equal(row[1], :success)
+    #     assert_equal(row[1, 2], [:success, 'a'])
     #   end
 
     #   puts "Requests:", p1.result.first.inspect
@@ -291,6 +296,7 @@ class TestVoting < Test::Unit::TestCase
     a5.stop
   end
 
+  ### Tests the multi in multipaxos.
   def test_multi_paxos
     p1 = MultiPaxosTest.new(:port => 54320)
     p2 = MultiPaxosTest.new(:port => 54326)
@@ -311,7 +317,7 @@ class TestVoting < Test::Unit::TestCase
     p2.register_callback(:result) do |r|
       r.each do |row|
         puts "Multipaxos Output:", row.inspect
-        assert_equal(row[1], :success)
+        assert_equal(row[1, 2], [:success, 'b'])
       end
       q.push true
     end
