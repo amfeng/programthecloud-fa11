@@ -82,6 +82,7 @@ class TestVoting < Test::Unit::TestCase
     q = Queue.new
     a1.register_callback(:accepted_proposal) do
       # Stopping a1
+      a1.stop
       p1.stop
       q.push true
     end
@@ -126,7 +127,7 @@ class TestVoting < Test::Unit::TestCase
     q2 = Queue.new
     p2.register_callback(:result) do |r|
       r.each do |row|
-        assert_equal(row[1, 2], [:success, 'a'])
+        assert_equal(row[1, 2], [:success, 'b'])
       end
       q2.push true
     end
