@@ -57,48 +57,48 @@ class TestVoting < Test::Unit::TestCase
   #  a5.stop
   # end
 
-  def test_failure_learner
-    p1 = MultiPaxosTest.new(:port => 54320)
-    a1 = MultiPaxosTest.new(:port => 54321)
-    a2 = MultiPaxosTest.new(:port => 54322)
-    a3 = MultiPaxosTest.new(:port => 54323)
-    a4 = MultiPaxosTest.new(:port => 54324)
-    a5 = MultiPaxosTest.new(:port => 54325)
-    p1.run_bg
-    a1.run_bg
-    a2.run_bg
-    a3.run_bg
-    a4.run_bg
-    a5.run_bg
+  # def test_failure_learner
+  #   p1 = MultiPaxosTest.new(:port => 54320)
+  #   a1 = MultiPaxosTest.new(:port => 54321)
+  #   a2 = MultiPaxosTest.new(:port => 54322)
+  #   a3 = MultiPaxosTest.new(:port => 54323)
+  #   a4 = MultiPaxosTest.new(:port => 54324)
+  #   a5 = MultiPaxosTest.new(:port => 54325)
+  #   p1.run_bg
+  #   a1.run_bg
+  #   a2.run_bg
+  #   a3.run_bg
+  #   a4.run_bg
+  #   a5.run_bg
 
-    q = Queue.new
-    a1.register_callback(:accepted_proposal) do
-      puts "Entered a1's accepted_proposal callback"
-      # Stopping a1
-      p1.stop
-      q.push true
-    end
+  #   q = Queue.new
+  #   a1.register_callback(:accepted_proposal) do
+  #     puts "Entered a1's accepted_proposal callback"
+  #     # Stopping a1
+  #     p1.stop
+  #     q.push true
+  #   end
     
-    q2 = Queue.new
-    p1.register_callback(:result) do |r|
-      r.each do |row|
-        puts "Multipaxos Output:", row.inspect
-        assert_equal(row[1], :success)
-      end
-      q2.push true
-    end
+  #   q2 = Queue.new
+  #   p1.register_callback(:result) do |r|
+  #     r.each do |row|
+  #       puts "Multipaxos Output:", row.inspect
+  #       assert_equal(row[1], :success)
+  #     end
+  #     q2.push true
+  #   end
 
-    p1.sync_do { p1.request <+ [[1, 'a']]}
-    q.pop
-    q2.pop
+  #   p1.sync_do { p1.request <+ [[1, 'a']]}
+  #   q.pop
+  #   q2.pop
     
-    p1.stop
-    a1.stop
-    a2.stop
-    a3.stop
-    a4.stop
-    a5.stop
-  end
+  #   p1.stop
+  #   a1.stop
+  #   a2.stop
+  #   a3.stop
+  #   a4.stop
+  #   a5.stop
+  # end
   
   # def test_duelling_proposers
   #   p1 = MultiPaxosTest.new(:port => 54320)
