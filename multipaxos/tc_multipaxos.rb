@@ -58,7 +58,6 @@ class TestVoting < Test::Unit::TestCase
   end
 
   def test_failure_learner
-    return
     p1 = MultiPaxosTest.new(:port => 54320)
     a1 = MultiPaxosTest.new(:port => 54321)
     a2 = MultiPaxosTest.new(:port => 54322)
