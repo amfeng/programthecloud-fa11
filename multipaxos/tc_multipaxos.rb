@@ -75,7 +75,7 @@ class TestVoting < Test::Unit::TestCase
     a1.register_callback(:accepted_proposal) do
       puts "Entered a1's accepted_proposal callback"
       # Stopping a1
-      a1.stop
+      p1.stop
       q.push true
     end
     
